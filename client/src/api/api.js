@@ -1,4 +1,10 @@
-const BASE = '/api';
+const isLocal = typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+// In local dev, Vite's proxy forwards /api to the backend, so a relative path works.
+// In production, the frontend (Vercel) and backend (Render) are different origins,
+// so we need the full backend URL here or every request 404s against Vercel itself.
+const BASE = isLocal ? '/api' : `${import.meta.env.VITE_API_URL}/api`;
 const AUTH_TOKEN_KEY = 'dispatch_auth_token';
 
 export const getAuthToken = () => localStorage.getItem(AUTH_TOKEN_KEY);
