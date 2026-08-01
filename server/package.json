@@ -1,0 +1,29 @@
+{
+  "name": "dispatch-server",
+  "version": "1.0.0",
+  "description": "Express and PostgreSQL backend for Dispatch Management",
+  "main": "server.js",
+  "scripts": {
+    "start": "npm run prisma:generate && node server.js",
+    "dev": "npm run prisma:generate && nodemon server.js",
+    "seed": "node prisma/seed.js",
+    "prisma:build": "node prisma/scripts/combine.js",
+    "prisma:generate": "node prisma/scripts/combine.js && prisma generate --schema prisma/generated/schema.prisma",
+    "prisma:validate": "node prisma/scripts/combine.js && npx prisma validate --schema prisma/generated/schema.prisma",
+    "prisma:seed": "prisma db seed"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js",
+    "schema": "prisma/generated/schema.prisma"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0",
+    "prisma": "^5.22.0"
+  }
+}

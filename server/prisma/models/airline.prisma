@@ -1,0 +1,19 @@
+// prisma/models/airline.prisma
+model Airline {
+  id                  String   @id @default(cuid())
+  code                String   @unique
+  name                String
+  awbPrefix           String   @unique
+  logoUrl             String?  @db.VarChar(255)
+  terminalAddress     String?
+  contactPhone        String?  @db.VarChar(20)
+  openTime            String?  @db.VarChar(5)
+  closeTime           String?  @db.VarChar(5)
+  open24h             Boolean  @default(false)
+  defaultCutoffHours  Int      @default(4)
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  shipments Shipment[]
+}

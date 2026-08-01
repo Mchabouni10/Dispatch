@@ -1,0 +1,73 @@
+model Shipment {
+  id                    String   @id @default(cuid())
+  type                  String   // "Import" or "Export"
+  status                String   @default("Pending")
+  
+  // Common fields
+  pieces                Int
+  weight                Float
+  weightUnit            String   @default("lb") // "lb" or "kg"
+  notes                 String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Common AWB for both types
+  airwaybillNumber      String?  // Full AWB: prefix + 8 digits
+  pmcCount              Int      @default(0) // Number of PMCs (pallets)
+  
+  // Import-specific fields
+  ordNumber             String?  // ORD number for imports only
+  lastFreeDay           DateTime?
+  storageFeePerDay      Float    @default(0)
+  storageFeeDaysOver    Int      @default(0)
+  storageFeePaid        Boolean  @default(false)
+  terminalFee           Float    @default(0)
+  terminalFeePaid       Boolean  @default(false)
+  isGDP                 Boolean  @default(false) // Temperature controlled
+  gdpTemperatureRange   String?  // e.g., "2-8°C", "15-25°C"
+  
+  // Export-specific fields
+  flightDate            DateTime?
+  lockoutTime           DateTime?
+  trailerNumber         String?
+  doorNumber            String?
+  truckType             String?  // "Straight" or "Cube"
+  pickupReadyAt         DateTime?
+  deliveryAppointmentAt DateTime?
+  
+  // Relations
+  airlineId   String?
+  warehouseId String?
+  airline     Airline?   @relation(fields: [airlineId], references: [id])
+  warehouse   Warehouse? @relation(fields: [warehouseId], references: [id])
+  trips       Trip[]     @relation("ShipmentTrips")
+  
+  // Many-to-many for grouping shipments (e.g., same truck load)
+  shipmentGroups ShipmentGroupShipment[]
+}
+
+// For grouping multiple shipments (e.g., multiple permits on one truck)
+model ShipmentGroup {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "TRUCK-123-2026-01-28"
+  type        String   // "Import" or "Export"
+  truckType   String?  // "Straight" or "Cube"
+  trailerNumber String?
+  doorNumber  String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  shipments   ShipmentGroupShipment[]
+}
+
+model ShipmentGroupShipment {
+  shipmentId      String
+  shipmentGroupId String
+  addedAt         DateTime @default(now())
+  
+  shipment      Shipment      @relation(fields: [shipmentId], references: [id])
+  shipmentGroup ShipmentGroup @relation(fields: [shipmentGroupId], references: [id])
+  
+  @@id([shipmentId, shipmentGroupId])
+}

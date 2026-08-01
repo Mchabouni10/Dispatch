@@ -1,0 +1,45 @@
+// prisma/models/equipment.prisma
+model Equipment {
+  id                     String   @id @default(cuid())
+  unitNumber             String   @unique
+  equipmentType          String
+  category               String
+  status                 String   @default("In Service")
+  licensePlate           String?
+  vin                    String?
+  year                   Int?
+  modelDetails           String?
+  capacityLbs            Int?
+  palletPositions        Int?
+  registrationExpiration DateTime? // doubles as plate renewal — same document/date in most states
+  nextMaintenanceDue     DateTime?
+  outOfServiceReason     String?
+  notes                  String?
+
+  // ─── INSURANCE ───
+  insuranceProvider      String?
+  insurancePolicyNumber  String?
+  insuranceExpiration    DateTime?
+
+  // ─── IFTA / IRP ───
+  iftaIrpExpiration      DateTime?
+
+  // ─── OWNERSHIP / LEASE ───
+  ownershipType          String   @default("Owned") // "Owned" | "Leased" | "Financed"
+  leaseCompany           String?
+  leaseEndDate           DateTime? // contract end for Leased, payoff date for Financed
+  monthlyPaymentAmount   Float?
+
+  // ─── HANDOFF BOARD ───
+  // Which driver currently has this unit checked out (independent of any Trip).
+  assignedDriverId       String?
+  assignedDriver         Driver?  @relation(fields: [assignedDriverId], references: [id])
+  // Cooldown: unit reads as unavailable until this time (e.g. 1hr after a driver is sent home).
+  availableAt            DateTime?
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  tripsAsTruck    Trip[] @relation("TruckTrips")
+  tripsAsTrailer  Trip[] @relation("TrailerTrips")
+}

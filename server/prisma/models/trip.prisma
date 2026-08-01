@@ -1,0 +1,24 @@
+// prisma/models/trip.prisma
+model Trip {
+  id                       String   @id @default(cuid())
+  tripNumber               String   @unique
+  runType                  String
+  plannedDepartureTime     DateTime?
+  expectedCompletionTime   DateTime?
+  startTime                DateTime?
+  finishTime               DateTime?
+  status                   String   @default("Scheduled")
+  notes                    String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  driverId   String?
+  truckId    String?
+  trailerId  String?
+  driver     Driver?    @relation(fields: [driverId], references: [id])
+  truck      Equipment? @relation("TruckTrips", fields: [truckId], references: [id])
+  trailer    Equipment? @relation("TrailerTrips", fields: [trailerId], references: [id])
+  
+  shipmentIds String[]
+  shipments   Shipment[] @relation("ShipmentTrips")
+}

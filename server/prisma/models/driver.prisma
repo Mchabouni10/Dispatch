@@ -1,0 +1,93 @@
+// prisma/models/driver.prisma
+model Driver {
+  id                    String   @id @default(cuid())
+  // ─── IDENTITY ───
+  name                  String
+  employeeId            String   @unique
+  phone                 String   @db.VarChar(20)
+  email                 String   @db.VarChar(100)
+  photo                 String?  @db.VarChar(255)
+  address               String?
+  dateOfBirth           DateTime?
+  gender                String?  @db.VarChar(10)
+  
+  // ─── AVAILABILITY ───
+  status                String   @default("Available")
+  statusReason          String?
+  // Leave window (only meaningful when status is Vacation / Sick Leave / Absent / Training)
+  leaveStart            DateTime?
+  leaveEnd              DateTime?
+  
+  // ─── SCHEDULE ───
+  // schedule is an auto-generated human-readable summary (e.g. "Mon-Fri (06:00-14:00)")
+  // derived from shiftStart/shiftEnd + daysOff, kept for display/search convenience.
+  schedule              String   @db.VarChar(100)
+  shiftStart            String?  @db.VarChar(5) // "HH:00", whole-hour shift start
+  shiftEnd              String?  @db.VarChar(5) // "HH:00", whole-hour shift end
+  daysOff               String[]
+  availableOnDaysOff    Boolean  @default(false)
+  overtimePreference    Boolean  @default(false)
+  maxWeeklyHours        Int      @default(60)
+  
+  // ─── VEHICLE ELIGIBILITY ───
+  licenseNumber         String?
+  licenseClass          String   @default("A") @db.VarChar(1)
+  licenseExpiration     DateTime?
+  licensePhoto          String?  @db.VarChar(255) // Scanned copy of the driver's license
+  medicalCertExpiration DateTime?
+  endorsements          String[]
+  vehicleTypes          String[]
+  trailerEligible       Boolean  @default(true)
+  hazmatCertified       Boolean  @default(false)
+  gdpTrained            Boolean  @default(false) // Good Distribution Practice: reefer handling, pickups, checklist compliance
+  
+  // ─── TRACKING ───
+  currentLocation       String?  
+  currentLatitude       Float?
+  currentLongitude      Float?
+  lastCheckin           DateTime?
+  hoursDrivenToday      Float    @default(0)
+  onDutyHours           Float    @default(0)
+  lastBreakTime         DateTime?
+  breakUntil            DateTime? // set on "Break" from the Handoff Board; cleared on check-in/status change
+  shiftStartTime        DateTime?
+  shiftEndTime          DateTime?
+  
+  // ─── PREFERENCES ───
+  preferredRunTypes     String[]
+  homeBase              String?  
+  maxRadius             Int?     
+  overnightAllowed      Boolean  @default(true)
+  crossBorder           Boolean  @default(false)
+  
+  // ─── PERFORMANCE ───
+  performanceRating     Float?   @default(3.0)
+  totalTripsCompleted   Int      @default(0)
+  onTimeDeliveryRate    Float?   @default(100.0)
+  safetyScore           Float?   @default(100.0)
+  incidents             Int      @default(0)
+  
+  // ─── COMPENSATION ───
+  hireDate              DateTime?
+  employmentStatus      String   @default("Active")
+  payType               String   @default("Hourly")
+  payRate               Float    @default(0)
+  overtimeRate          Float?   
+  bonusEligible         Boolean  @default(false)
+  lastPayRaise          DateTime?
+  
+  // ─── CONTACT ───
+  emergencyContactName  String?
+  emergencyContactPhone String?  @db.VarChar(20)
+  emergencyContactRelation String?
+  
+  // ─── NOTES ───
+  notes                 String?
+  specialSkills         String?
+  medicalConditions     String?  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  trips Trip[]
+  assignedEquipment Equipment[] // truck(s)/trailer(s) currently handed off to this driver via the Handoff Board
+}

@@ -1,0 +1,16 @@
+// prisma/models/warehouse.prisma
+model Warehouse {
+  id              String   @id @default(cuid())
+  name            String
+  address         String?
+  contactPhone    String?  @db.VarChar(20)
+  is24Hours       Boolean  @default(false)
+  daysOpen        String[] @default([])
+  openTime        String?  @db.VarChar(5)
+  closeTime       String?  @db.VarChar(5)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  shipments Shipment[]
+}

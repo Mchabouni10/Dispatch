@@ -1,0 +1,165 @@
+.sidebar {
+  width: var(--sidebar-width);
+  min-height: 100vh;
+  background: rgba(7, 13, 26, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 100;
+  padding: 20px 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px 24px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.brandIcon {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-cyan));
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 16px;
+  flex-shrink: 0;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(79, 142, 247, 0.4);
+}
+
+.brandLogo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.brandName {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+}
+
+.brandSub {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 1px;
+}
+
+.nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 10px;
+  overflow-y: auto;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  font-weight: 500;
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.navItem::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--accent), var(--accent-cyan));
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.navItem:hover {
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+}
+
+.navItem:hover .navIcon {
+  color: var(--accent);
+}
+
+.navItem.active {
+  color: white;
+  background: linear-gradient(135deg, rgba(79, 142, 247, 0.2), rgba(0, 212, 255, 0.1));
+  border: 1px solid rgba(79, 142, 247, 0.3);
+  box-shadow: 0 0 20px rgba(79, 142, 247, 0.1);
+}
+
+.navItem.active .navIcon {
+  color: var(--accent-cyan);
+}
+
+.navItem.active .activeDot {
+  opacity: 1;
+}
+
+.navIcon {
+  width: 18px;
+  text-align: center;
+  font-size: 14px;
+  transition: color 0.2s ease;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.navLabel {
+  flex: 1;
+  position: relative;
+  z-index: 1;
+}
+
+.activeDot {
+  width: 6px;
+  height: 6px;
+  background: var(--accent-cyan);
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  box-shadow: 0 0 8px var(--accent-cyan);
+  position: relative;
+  z-index: 1;
+}
+
+.footer {
+  padding: 16px 20px 0;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+
+.account { padding: 0 0 14px; }
+.accountName { color: var(--text-primary); font-size: 12px; font-weight: 700; }
+.accountEmail { margin-top: 3px; color: var(--text-muted); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account button { margin-top: 10px; padding: 0; background: none; color: var(--accent-cyan); font-size: 11px; }
+.account button:hover { color: var(--text-primary); }
+
+.version {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+}

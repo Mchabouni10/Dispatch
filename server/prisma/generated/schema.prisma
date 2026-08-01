@@ -1,0 +1,291 @@
+// Generated from prisma/models/*.prisma
+// Keep the model definitions in separate files for easier edits.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// prisma/models/airline.prisma
+model Airline {
+  id                  String   @id @default(cuid())
+  code                String   @unique
+  name                String
+  awbPrefix           String   @unique
+  logoUrl             String?  @db.VarChar(255)
+  terminalAddress     String?
+  contactPhone        String?  @db.VarChar(20)
+  openTime            String?  @db.VarChar(5)
+  closeTime           String?  @db.VarChar(5)
+  open24h             Boolean  @default(false)
+  defaultCutoffHours  Int      @default(4)
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  shipments Shipment[]
+}
+// prisma/models/driver.prisma
+model Driver {
+  id                    String   @id @default(cuid())
+  // ─── IDENTITY ───
+  name                  String
+  employeeId            String   @unique
+  phone                 String   @db.VarChar(20)
+  email                 String   @db.VarChar(100)
+  photo                 String?  @db.VarChar(255)
+  address               String?
+  dateOfBirth           DateTime?
+  gender                String?  @db.VarChar(10)
+  
+  // ─── AVAILABILITY ───
+  status                String   @default("Available")
+  statusReason          String?
+  // Leave window (only meaningful when status is Vacation / Sick Leave / Absent / Training)
+  leaveStart            DateTime?
+  leaveEnd              DateTime?
+  
+  // ─── SCHEDULE ───
+  // schedule is an auto-generated human-readable summary (e.g. "Mon-Fri (06:00-14:00)")
+  // derived from shiftStart/shiftEnd + daysOff, kept for display/search convenience.
+  schedule              String   @db.VarChar(100)
+  shiftStart            String?  @db.VarChar(5) // "HH:00", whole-hour shift start
+  shiftEnd              String?  @db.VarChar(5) // "HH:00", whole-hour shift end
+  daysOff               String[]
+  availableOnDaysOff    Boolean  @default(false)
+  overtimePreference    Boolean  @default(false)
+  maxWeeklyHours        Int      @default(60)
+  
+  // ─── VEHICLE ELIGIBILITY ───
+  licenseNumber         String?
+  licenseClass          String   @default("A") @db.VarChar(1)
+  licenseExpiration     DateTime?
+  licensePhoto          String?  @db.VarChar(255) // Scanned copy of the driver's license
+  medicalCertExpiration DateTime?
+  endorsements          String[]
+  vehicleTypes          String[]
+  trailerEligible       Boolean  @default(true)
+  hazmatCertified       Boolean  @default(false)
+  gdpTrained            Boolean  @default(false) // Good Distribution Practice: reefer handling, pickups, checklist compliance
+  
+  // ─── TRACKING ───
+  currentLocation       String?  
+  currentLatitude       Float?
+  currentLongitude      Float?
+  lastCheckin           DateTime?
+  hoursDrivenToday      Float    @default(0)
+  onDutyHours           Float    @default(0)
+  lastBreakTime         DateTime?
+  breakUntil            DateTime? // set on "Break" from the Handoff Board; cleared on check-in/status change
+  shiftStartTime        DateTime?
+  shiftEndTime          DateTime?
+  
+  // ─── PREFERENCES ───
+  preferredRunTypes     String[]
+  homeBase              String?  
+  maxRadius             Int?     
+  overnightAllowed      Boolean  @default(true)
+  crossBorder           Boolean  @default(false)
+  
+  // ─── PERFORMANCE ───
+  performanceRating     Float?   @default(3.0)
+  totalTripsCompleted   Int      @default(0)
+  onTimeDeliveryRate    Float?   @default(100.0)
+  safetyScore           Float?   @default(100.0)
+  incidents             Int      @default(0)
+  
+  // ─── COMPENSATION ───
+  hireDate              DateTime?
+  employmentStatus      String   @default("Active")
+  payType               String   @default("Hourly")
+  payRate               Float    @default(0)
+  overtimeRate          Float?   
+  bonusEligible         Boolean  @default(false)
+  lastPayRaise          DateTime?
+  
+  // ─── CONTACT ───
+  emergencyContactName  String?
+  emergencyContactPhone String?  @db.VarChar(20)
+  emergencyContactRelation String?
+  
+  // ─── NOTES ───
+  notes                 String?
+  specialSkills         String?
+  medicalConditions     String?  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  trips Trip[]
+  assignedEquipment Equipment[] // truck(s)/trailer(s) currently handed off to this driver via the Handoff Board
+}
+// prisma/models/equipment.prisma
+model Equipment {
+  id                     String   @id @default(cuid())
+  unitNumber             String   @unique
+  equipmentType          String
+  category               String
+  status                 String   @default("In Service")
+  licensePlate           String?
+  vin                    String?
+  year                   Int?
+  modelDetails           String?
+  capacityLbs            Int?
+  palletPositions        Int?
+  registrationExpiration DateTime? // doubles as plate renewal — same document/date in most states
+  nextMaintenanceDue     DateTime?
+  outOfServiceReason     String?
+  notes                  String?
+
+  // ─── INSURANCE ───
+  insuranceProvider      String?
+  insurancePolicyNumber  String?
+  insuranceExpiration    DateTime?
+
+  // ─── IFTA / IRP ───
+  iftaIrpExpiration      DateTime?
+
+  // ─── OWNERSHIP / LEASE ───
+  ownershipType          String   @default("Owned") // "Owned" | "Leased" | "Financed"
+  leaseCompany           String?
+  leaseEndDate           DateTime? // contract end for Leased, payoff date for Financed
+  monthlyPaymentAmount   Float?
+
+  // ─── HANDOFF BOARD ───
+  // Which driver currently has this unit checked out (independent of any Trip).
+  assignedDriverId       String?
+  assignedDriver         Driver?  @relation(fields: [assignedDriverId], references: [id])
+  // Cooldown: unit reads as unavailable until this time (e.g. 1hr after a driver is sent home).
+  availableAt            DateTime?
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  tripsAsTruck    Trip[] @relation("TruckTrips")
+  tripsAsTrailer  Trip[] @relation("TrailerTrips")
+}
+model Shipment {
+  id                    String   @id @default(cuid())
+  type                  String   // "Import" or "Export"
+  status                String   @default("Pending")
+  
+  // Common fields
+  pieces                Int
+  weight                Float
+  weightUnit            String   @default("lb") // "lb" or "kg"
+  notes                 String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Common AWB for both types
+  airwaybillNumber      String?  // Full AWB: prefix + 8 digits
+  pmcCount              Int      @default(0) // Number of PMCs (pallets)
+  
+  // Import-specific fields
+  ordNumber             String?  // ORD number for imports only
+  lastFreeDay           DateTime?
+  storageFeePerDay      Float    @default(0)
+  storageFeeDaysOver    Int      @default(0)
+  storageFeePaid        Boolean  @default(false)
+  terminalFee           Float    @default(0)
+  terminalFeePaid       Boolean  @default(false)
+  isGDP                 Boolean  @default(false) // Temperature controlled
+  gdpTemperatureRange   String?  // e.g., "2-8°C", "15-25°C"
+  
+  // Export-specific fields
+  flightDate            DateTime?
+  lockoutTime           DateTime?
+  trailerNumber         String?
+  doorNumber            String?
+  truckType             String?  // "Straight" or "Cube"
+  pickupReadyAt         DateTime?
+  deliveryAppointmentAt DateTime?
+  
+  // Relations
+  airlineId   String?
+  warehouseId String?
+  airline     Airline?   @relation(fields: [airlineId], references: [id])
+  warehouse   Warehouse? @relation(fields: [warehouseId], references: [id])
+  trips       Trip[]     @relation("ShipmentTrips")
+  
+  // Many-to-many for grouping shipments (e.g., same truck load)
+  shipmentGroups ShipmentGroupShipment[]
+}
+
+// For grouping multiple shipments (e.g., multiple permits on one truck)
+model ShipmentGroup {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "TRUCK-123-2026-01-28"
+  type        String   // "Import" or "Export"
+  truckType   String?  // "Straight" or "Cube"
+  trailerNumber String?
+  doorNumber  String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  shipments   ShipmentGroupShipment[]
+}
+
+model ShipmentGroupShipment {
+  shipmentId      String
+  shipmentGroupId String
+  addedAt         DateTime @default(now())
+  
+  shipment      Shipment      @relation(fields: [shipmentId], references: [id])
+  shipmentGroup ShipmentGroup @relation(fields: [shipmentGroupId], references: [id])
+  
+  @@id([shipmentId, shipmentGroupId])
+}
+
+// prisma/models/trip.prisma
+model Trip {
+  id                       String   @id @default(cuid())
+  tripNumber               String   @unique
+  runType                  String
+  plannedDepartureTime     DateTime?
+  expectedCompletionTime   DateTime?
+  startTime                DateTime?
+  finishTime               DateTime?
+  status                   String   @default("Scheduled")
+  notes                    String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  driverId   String?
+  truckId    String?
+  trailerId  String?
+  driver     Driver?    @relation(fields: [driverId], references: [id])
+  truck      Equipment? @relation("TruckTrips", fields: [truckId], references: [id])
+  trailer    Equipment? @relation("TrailerTrips", fields: [trailerId], references: [id])
+  
+  shipmentIds String[]
+  shipments   Shipment[] @relation("ShipmentTrips")
+}
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+// prisma/models/warehouse.prisma
+model Warehouse {
+  id              String   @id @default(cuid())
+  name            String
+  address         String?
+  contactPhone    String?  @db.VarChar(20)
+  is24Hours       Boolean  @default(false)
+  daysOpen        String[] @default([])
+  openTime        String?  @db.VarChar(5)
+  closeTime       String?  @db.VarChar(5)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  shipments Shipment[]
+}
