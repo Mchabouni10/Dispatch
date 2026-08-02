@@ -1,4 +1,4 @@
-//src/pages/Handoff/HandoffView.jsx
+// src/pages/Handoff/HandoffView.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -18,18 +18,28 @@ import {
   faUserClock,
   faBell,
   faCalendarDay,
+  faHistory,
+  faArrowsRotate,
+  faTrailer,
+  faCheck,
+  faXmark,
+  faPen,
+  faList,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   getDrivers,
   getEquipment,
   updateDriverStatus,
   assignEquipment,
+  getDriverHistory,
+  getEquipmentHistory,
+  swapEquipment,
+  getActiveHandoffs,
 } from "../../api/api.js";
 import Modal from "../../components/Modal/Modal.jsx";
 import styles from "./HandoffView.module.css";
 
-// Statuses this board cares about. Leave statuses (Vacation/Sick Leave/Absent/Training),
-// "On Trip" (owned by the Dispatch board) and "Terminated" are intentionally excluded.
+// Statuses this board cares about
 const BOARD_STATUSES = ["Available", "Break", "Off Duty", "On Call"];
 
 const TYPE_ICONS = {
@@ -39,9 +49,6 @@ const TYPE_ICONS = {
   "Sprinter Van": faVanShuttle,
 };
 
-// Fallback only — used when a driver has no vehicleTypes set on their profile.
-// vehicleTypes (curated on the Drivers page) is the real source of truth, since a
-// Class A CDL legally covers B/C equipment too and shouldn't be locked to Tractors only.
 const CLASS_FALLBACK = {
   A: "Tractor",
   B: "Straight Truck",
@@ -51,9 +58,29 @@ const CLASS_FALLBACK = {
 
 const WORK_DAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+// Swap reasons
+const SWAP_REASONS = [
+  { value: "MECHANICAL", label: "Mechanical Issue" },
+  { value: "BREAKDOWN", label: "Breakdown" },
+  { value: "MAINTENANCE", label: "Maintenance Required" },
+  { value: "ROUTE_CHANGE", label: "Route Change" },
+  { value: "DRIVER_REQUEST", label: "Driver Request" },
+  { value: "DISPATCH", label: "Dispatch Decision" },
+  { value: "TRAILER_SWAP", label: "Trailer Swap Only" },
+  { value: "RELOCATION", label: "Equipment Relocation" },
+];
+
+const RETURN_REASONS = [
+  { value: "SHIFT_END", label: "End of Shift" },
+  { value: "BREAK", label: "Break (temporary)" },
+  { value: "MAINTENANCE", label: "Maintenance Needed" },
+  { value: "DAMAGE", label: "Damage Reported" },
+  { value: "RELOCATION", label: "Relocation" },
+];
+
 function eligibleTypesFor(driver) {
-  if (driver.vehicleTypes?.length) return driver.vehicleTypes;
-  const fallback = CLASS_FALLBACK[driver.licenseClass];
+  if (driver?.vehicleTypes?.length) return driver.vehicleTypes;
+  const fallback = CLASS_FALLBACK[driver?.licenseClass];
   return fallback ? [fallback] : [];
 }
 
@@ -100,7 +127,6 @@ function minutesUntil(value) {
   return Math.round((new Date(value).getTime() - Date.now()) / 60000);
 }
 
-/** Today's scheduled shift-start Date, or null if no shiftStart on file. */
 function shiftStartToday(driver) {
   if (!driver?.shiftStart) return null;
   const [h] = String(driver.shiftStart).split(":").map(Number);
@@ -110,7 +136,6 @@ function shiftStartToday(driver) {
   return d;
 }
 
-/** Minutes late at check-in (positive = late). Null if not comparable. */
 function latenessAtCheckin(driver) {
   const expected = shiftStartToday(driver);
   if (!expected || !driver.lastCheckin) return null;
@@ -120,7 +145,6 @@ function latenessAtCheckin(driver) {
   );
 }
 
-/** Minutes past scheduled start while still not checked in. Null if N/A or early. */
 function minutesPastExpectedStart(driver) {
   const expected = shiftStartToday(driver);
   if (!expected) return null;
@@ -130,9 +154,7 @@ function minutesPastExpectedStart(driver) {
 
 function isScheduledToday(driver) {
   if (!driver) return true;
-  const dayKey =
-    WORK_DAY_KEYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
-  // daysOff is the source of truth when present; otherwise assume scheduled
+  const dayKey = WORK_DAY_KEYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
   if (Array.isArray(driver.daysOff) && driver.daysOff.length > 0) {
     if (driver.daysOff.includes(dayKey)) {
       return !!driver.availableOnDaysOff;
@@ -151,20 +173,62 @@ function isPastShiftEnd(driver) {
   return Date.now() > end.getTime();
 }
 
+function formatDuration(minutes) {
+  if (!minutes) return "0m";
+  const hrs = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+}
+
 export default function HandoffView() {
   const [drivers, setDrivers] = useState([]);
   const [equipment, setEquipment] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [busyId, setBusyId] = useState(null); // driver id currently mid-request, for button spinners
-  const [tick, setTick] = useState(0); // forces countdown re-render
+  const [busyId, setBusyId] = useState(null);
+  const [tick, setTick] = useState(0);
+  const [selectedDriverHistory, setSelectedDriverHistory] = useState(null);
+  const [historyData, setHistoryData] = useState(null);
+  const [showHistory, setShowHistory] = useState(false);
+  // Smart switch: history modal can show the full record or scope it to a
+  // recent window for quick safety/compliance lookups (e.g. "what has this
+  // driver been operating in the last 30 days?").
+  const [historyRange, setHistoryRange] = useState("30d");
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const HISTORY_RANGES = [
+    { value: "30d", label: "Last 30 Days", days: 30 },
+    { value: "90d", label: "Last 90 Days", days: 90 },
+    { value: "all", label: "All Time", days: null },
+  ];
 
   // Check-in modal
   const [checkInDriver, setCheckInDriver] = useState(null);
   const [selectedTruckId, setSelectedTruckId] = useState(null);
+  const [selectedTrailerId, setSelectedTrailerId] = useState(null);
+  const [odometerStart, setOdometerStart] = useState("");
+  const [fuelLevelStart, setFuelLevelStart] = useState("");
 
   // End-shift modal
   const [endShiftDriver, setEndShiftDriver] = useState(null);
+  const [endShiftData, setEndShiftData] = useState({
+    odometerEnd: "",
+    fuelLevelEnd: "",
+    damageReported: false,
+    damageDescription: "",
+    returnReason: "SHIFT_END",
+    returnNote: "",
+  });
+
+  // Swap modal
+  const [swapDriver, setSwapDriver] = useState(null);
+  const [swapData, setSwapData] = useState({
+    currentEquipmentId: "",
+    newEquipmentId: "",
+    trailerId: "",
+    reason: "DRIVER_REQUEST",
+    reasonNote: "",
+  });
 
   const load = useCallback(async () => {
     try {
@@ -186,11 +250,9 @@ export default function HandoffView() {
     load();
   }, [load]);
 
-  // Live-refresh so break countdowns, cooldown timers, and lateness stay accurate
   useEffect(() => {
     const id = setInterval(() => {
       setTick((t) => t + 1);
-      // Soft re-fetch every 60s so Equipment/Drivers changes from other pages appear
       if (tick % 2 === 1) load();
     }, 30000);
     return () => clearInterval(id);
@@ -218,7 +280,6 @@ export default function HandoffView() {
   );
 
   const now = Date.now();
-  // tick is intentionally read so available/cooldown lists recompute each interval
   void tick;
 
   const availableTrucks = useMemo(
@@ -233,6 +294,17 @@ export default function HandoffView() {
     [equipment, now],
   );
 
+  const availableTrailers = useMemo(
+    () =>
+      equipment.filter(
+        (e) =>
+          e.category === "Trailer" &&
+          e.status === "In Service" &&
+          !e.assignedDriverId,
+      ),
+    [equipment],
+  );
+
   const cooldownTrucks = useMemo(
     () =>
       equipment.filter(
@@ -245,7 +317,12 @@ export default function HandoffView() {
   );
 
   const truckFor = useCallback(
-    (driverId) => equipment.find((e) => e.assignedDriverId === driverId),
+    (driverId) => equipment.find((e) => e.assignedDriverId === driverId && e.category === "Power Unit"),
+    [equipment],
+  );
+
+  const trailerFor = useCallback(
+    (driverId) => equipment.find((e) => e.assignedDriverId === driverId && e.category === "Trailer"),
     [equipment],
   );
 
@@ -279,23 +356,43 @@ export default function HandoffView() {
       eligible.includes(t.equipmentType),
     );
     setSelectedTruckId(recommended?.id || null);
+    setSelectedTrailerId(null);
+    setOdometerStart("");
+    setFuelLevelStart("");
     setCheckInDriver(driver);
   };
 
   const confirmCheckIn = async (e) => {
     e.preventDefault();
-    if (!selectedTruckId) return;
+    if (!selectedTruckId) {
+      setError("Please select a truck");
+      return;
+    }
     setBusyId(checkInDriver.id);
     try {
       const nowIso = new Date().toISOString();
+      
+      // Update driver status
       await updateDriverStatus(checkInDriver.id, {
         status: "Available",
         lastCheckin: nowIso,
         shiftStartTime: nowIso,
       });
-      await assignEquipment(selectedTruckId, { driverId: checkInDriver.id });
+
+      // Assign equipment with history logging
+      await assignEquipment(selectedTruckId, {
+        driverId: checkInDriver.id,
+        action: "CHECKOUT",
+        reason: "SHIFT_START",
+        ...(selectedTrailerId && { trailerId: selectedTrailerId }),
+        ...(odometerStart && { odometerStart: parseInt(odometerStart) }),
+        ...(fuelLevelStart && { fuelLevelStart }),
+        preTripCompleted: true,
+      });
+
       setCheckInDriver(null);
       setSelectedTruckId(null);
+      setSelectedTrailerId(null);
       await load();
     } catch (err) {
       setError(err.message || "Check-in failed");
@@ -304,14 +401,45 @@ export default function HandoffView() {
     }
   };
 
-  const backToAvailable = async (driver) => {
+  const returnEquipment = async (driver) => {
+    const truck = truckFor(driver.id);
+    if (!truck) {
+      setError("No truck found to return");
+      return;
+    }
+
     setBusyId(driver.id);
     try {
-      await updateDriverStatus(driver.id, { status: "Available" });
+      await assignEquipment(truck.id, {
+        release: true,
+        cooldownMinutes: 0,
+        reason: endShiftData.returnReason,
+        reasonNote: endShiftData.returnNote || "End of shift",
+        odometerEnd: endShiftData.odometerEnd ? parseInt(endShiftData.odometerEnd) : undefined,
+        fuelLevelEnd: endShiftData.fuelLevelEnd || undefined,
+        damageDescription: endShiftData.damageReported ? endShiftData.damageDescription : undefined,
+        postTripNotes: endShiftData.damageReported ? `Damage reported: ${endShiftData.damageDescription}` : "Post-trip inspection completed",
+        postTripCompleted: true,
+      });
+
+      // Update driver status
+      await updateDriverStatus(driver.id, {
+        status: "Off Duty",
+        shiftEndTime: new Date().toISOString(),
+      });
+
       setEndShiftDriver(null);
+      setEndShiftData({
+        odometerEnd: "",
+        fuelLevelEnd: "",
+        damageReported: false,
+        damageDescription: "",
+        returnReason: "SHIFT_END",
+        returnNote: "",
+      });
       await load();
     } catch (err) {
-      setError(err.message || "Update failed");
+      setError(err.message || "Return failed");
     } finally {
       setBusyId(null);
     }
@@ -324,7 +452,6 @@ export default function HandoffView() {
         status: "Break",
         breakUntil: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       });
-      setEndShiftDriver(null);
       await load();
     } catch (err) {
       setError(err.message || "Update failed");
@@ -333,23 +460,87 @@ export default function HandoffView() {
     }
   };
 
-  const sendHome = async (driver) => {
+  const backToAvailable = async (driver) => {
     setBusyId(driver.id);
     try {
-      await updateDriverStatus(driver.id, {
-        status: "Off Duty",
-        shiftEndTime: new Date().toISOString(),
-      });
-      const truck = truckFor(driver.id);
-      if (truck) {
-        await assignEquipment(truck.id, { release: true, cooldownMinutes: 60 });
-      }
-      setEndShiftDriver(null);
+      await updateDriverStatus(driver.id, { status: "Available" });
       await load();
     } catch (err) {
       setError(err.message || "Update failed");
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const openSwap = (driver) => {
+    const truck = truckFor(driver.id);
+    if (!truck) {
+      setError("Driver has no truck to swap");
+      return;
+    }
+    setSwapDriver(driver);
+    setSwapData({
+      currentEquipmentId: truck.id,
+      newEquipmentId: "",
+      trailerId: trailerFor(driver.id)?.id || "",
+      reason: "DRIVER_REQUEST",
+      reasonNote: "",
+    });
+    setError("");
+  };
+
+  const confirmSwap = async () => {
+    if (!swapData.newEquipmentId) {
+      setError("Please select replacement equipment");
+      return;
+    }
+
+    setBusyId(swapDriver.id);
+    try {
+      await swapEquipment(swapData.currentEquipmentId, {
+        driverId: swapDriver.id,
+        newEquipmentId: swapData.newEquipmentId,
+        trailerId: swapData.trailerId || undefined,
+        reason: swapData.reason,
+        reasonNote: swapData.reasonNote || "Equipment swapped mid-shift",
+      });
+
+      setSwapDriver(null);
+      await load();
+    } catch (err) {
+      setError(err.message || "Swap failed");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const fetchHistory = async (driver, range) => {
+    const rangeConfig = HISTORY_RANGES.find((r) => r.value === range) || HISTORY_RANGES[0];
+    setHistoryLoading(true);
+    try {
+      const data = await getDriverHistory(driver.id, {
+        limit: 50,
+        ...(rangeConfig.days ? { days: rangeConfig.days } : {}),
+      });
+      setHistoryData(data);
+    } catch (err) {
+      setError(err.message || "Failed to load history");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const viewHistory = async (driver) => {
+    setError("");
+    setSelectedDriverHistory(driver);
+    setShowHistory(true);
+    await fetchHistory(driver, historyRange);
+  };
+
+  const switchHistoryRange = async (range) => {
+    setHistoryRange(range);
+    if (selectedDriverHistory) {
+      await fetchHistory(selectedDriverHistory, range);
     }
   };
 
@@ -363,15 +554,13 @@ export default function HandoffView() {
         <div>
           <h1 className={styles.pageTitle}>Handoff Board</h1>
           <p className={styles.pageSub}>
-            Check drivers in with a truck for the day, and manage breaks or
-            end-of-shift.
+            Check drivers in with equipment for the day, manage swaps, and track complete history.
           </p>
         </div>
         {cooldownTrucks.length > 0 && (
           <div className={styles.cooldownSummary}>
             <FontAwesomeIcon icon={faClock} />
-            {cooldownTrucks.length} truck
-            {cooldownTrucks.length > 1 ? "s" : ""} cooling down
+            {cooldownTrucks.length} truck{cooldownTrucks.length > 1 ? "s" : ""} cooling down
             <span className={styles.cooldownDetail}>
               {cooldownTrucks
                 .map((t) => {
@@ -419,7 +608,7 @@ export default function HandoffView() {
       {error && <div className={styles.formError}>{error}</div>}
 
       <div className={styles.board}>
-        {/* ── Not checked in ─────────────────────────────────────── */}
+        {/* ── Not checked in ── */}
         <section className={styles.column}>
           <div className={styles.columnHeader}>
             <span>Not Checked In</span>
@@ -477,7 +666,6 @@ export default function HandoffView() {
                     </div>
                   </div>
                   <div className={styles.cardBody}>
-                    {/* Schedule vs now */}
                     <div className={styles.scheduleRow}>
                       <FontAwesomeIcon
                         icon={faCalendarDay}
@@ -530,7 +718,7 @@ export default function HandoffView() {
           </div>
         </section>
 
-        {/* ── On shift ────────────────────────────────────────────── */}
+        {/* ── On shift ── */}
         <section className={styles.column}>
           <div className={styles.columnHeader}>
             <span>On Shift</span>
@@ -544,6 +732,7 @@ export default function HandoffView() {
             )}
             {onShiftDrivers.map((driver) => {
               const truck = truckFor(driver.id);
+              const trailer = trailerFor(driver.id);
               const statusClass = driver.status?.replace(" ", "_") || "Unknown";
               const remaining =
                 driver.status === "Break"
@@ -552,6 +741,7 @@ export default function HandoffView() {
               const breakOver = remaining !== null && remaining <= 0;
               const lateMins = latenessAtCheckin(driver);
               const pastEnd = isPastShiftEnd(driver);
+
               return (
                 <div
                   key={driver.id}
@@ -594,23 +784,38 @@ export default function HandoffView() {
                               : `${remaining} min left`}
                           </span>
                         )}
+                        <button
+                          className={styles.historyBtn}
+                          onClick={() => viewHistory(driver)}
+                          title="View equipment history"
+                        >
+                          <FontAwesomeIcon icon={faHistory} />
+                        </button>
                       </div>
                     </div>
                   </div>
                   <div className={styles.cardBody}>
-                    {truck ? (
-                      <div className={styles.truckChip}>
-                        <FontAwesomeIcon
-                          icon={TYPE_ICONS[truck.equipmentType] || faTruck}
-                        />
-                        {truck.unitNumber} · {truck.equipmentType}
-                      </div>
-                    ) : (
-                      <div className={styles.noTruckChip}>
-                        <FontAwesomeIcon icon={faTriangleExclamation} />
-                        No truck assigned
-                      </div>
-                    )}
+                    <div className={styles.equipmentRow}>
+                      {truck ? (
+                        <div className={styles.truckChip}>
+                          <FontAwesomeIcon
+                            icon={TYPE_ICONS[truck.equipmentType] || faTruck}
+                          />
+                          {truck.unitNumber} · {truck.equipmentType}
+                        </div>
+                      ) : (
+                        <div className={styles.noTruckChip}>
+                          <FontAwesomeIcon icon={faTriangleExclamation} />
+                          No truck assigned
+                        </div>
+                      )}
+                      {trailer && (
+                        <div className={styles.trailerChip}>
+                          <FontAwesomeIcon icon={faTrailer} />
+                          {trailer.unitNumber} · Trailer
+                        </div>
+                      )}
+                    </div>
 
                     <div className={styles.checkinMeta}>
                       <div className={styles.checkinTime}>
@@ -673,18 +878,29 @@ export default function HandoffView() {
                           disabled={busyId === driver.id}
                         >
                           <FontAwesomeIcon icon={faRotateLeft} />
-                          {busyId === driver.id
-                            ? "Updating…"
-                            : "Make Available"}
+                          {busyId === driver.id ? "Updating…" : "Make Available"}
                         </button>
                       ) : (
-                        <button
-                          className={styles.manageBtn}
-                          onClick={() => setEndShiftDriver(driver)}
-                          disabled={busyId === driver.id}
-                        >
-                          Manage Shift
-                        </button>
+                        <>
+                          {truck && (
+                            <button
+                              className={styles.swapBtn}
+                              onClick={() => openSwap(driver)}
+                              disabled={busyId === driver.id}
+                            >
+                              <FontAwesomeIcon icon={faArrowsRotate} />
+                              Swap
+                            </button>
+                          )}
+                          <button
+                            className={styles.manageBtn}
+                            onClick={() => setEndShiftDriver(driver)}
+                            disabled={busyId === driver.id}
+                          >
+                            <FontAwesomeIcon icon={faHouse} />
+                            Return
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -695,12 +911,12 @@ export default function HandoffView() {
         </section>
       </div>
 
-      {/* ── Check-in modal ─────────────────────────────────────────── */}
+      {/* ── Check-in modal ── */}
       <Modal
         isOpen={!!checkInDriver}
         onClose={() => setCheckInDriver(null)}
         title={`Check In ${checkInDriver?.name || ""}`}
-        size="md"
+        size="lg"
       >
         <form className={styles.form} onSubmit={confirmCheckIn}>
           {error && <div className={styles.formError}>{error}</div>}
@@ -731,55 +947,126 @@ export default function HandoffView() {
               })()}
             </p>
           )}
-          <div className={styles.truckGrid}>
-            {availableTrucks.length === 0 && (
-              <div className={styles.emptyState}>
-                No trucks available right now.
-                {cooldownTrucks.length > 0 && (
-                  <span> {cooldownTrucks.length} cooling down.</span>
-                )}
-              </div>
-            )}
-            {availableTrucks
-              .slice()
-              .sort((a, b) => {
-                const eligible = eligibleTypesFor(checkInDriver || {});
-                const aRec = eligible.includes(a.equipmentType) ? 0 : 1;
-                const bRec = eligible.includes(b.equipmentType) ? 0 : 1;
-                return aRec - bRec;
-              })
-              .map((truck) => {
-                const eligible = eligibleTypesFor(checkInDriver || {});
-                const recommended = eligible.includes(truck.equipmentType);
-                return (
-                  <button
-                    type="button"
-                    key={truck.id}
-                    className={`${styles.truckOption} ${
-                      selectedTruckId === truck.id
-                        ? styles.truckOptionSelected
-                        : ""
-                    }`}
-                    onClick={() => setSelectedTruckId(truck.id)}
-                  >
-                    <FontAwesomeIcon
-                      icon={TYPE_ICONS[truck.equipmentType] || faTruck}
-                    />
-                    <div>
-                      <div className={styles.truckOptionUnit}>
-                        {truck.unitNumber}
+
+          <div className={styles.formSection}>
+            <label className={styles.sectionLabel}>Select Truck</label>
+            <div className={styles.truckGrid}>
+              {availableTrucks.length === 0 && (
+                <div className={styles.emptyState}>
+                  No trucks available right now.
+                  {cooldownTrucks.length > 0 && (
+                    <span> {cooldownTrucks.length} cooling down.</span>
+                  )}
+                </div>
+              )}
+              {availableTrucks
+                .slice()
+                .sort((a, b) => {
+                  const eligible = eligibleTypesFor(checkInDriver || {});
+                  const aRec = eligible.includes(a.equipmentType) ? 0 : 1;
+                  const bRec = eligible.includes(b.equipmentType) ? 0 : 1;
+                  return aRec - bRec;
+                })
+                .map((truck) => {
+                  const eligible = eligibleTypesFor(checkInDriver || {});
+                  const recommended = eligible.includes(truck.equipmentType);
+                  return (
+                    <button
+                      type="button"
+                      key={truck.id}
+                      className={`${styles.truckOption} ${
+                        selectedTruckId === truck.id
+                          ? styles.truckOptionSelected
+                          : ""
+                      }`}
+                      onClick={() => setSelectedTruckId(truck.id)}
+                    >
+                      <FontAwesomeIcon
+                        icon={TYPE_ICONS[truck.equipmentType] || faTruck}
+                      />
+                      <div>
+                        <div className={styles.truckOptionUnit}>
+                          {truck.unitNumber}
+                        </div>
+                        <div className={styles.truckOptionType}>
+                          {truck.equipmentType}
+                        </div>
                       </div>
-                      <div className={styles.truckOptionType}>
-                        {truck.equipmentType}
-                      </div>
-                    </div>
-                    {recommended && (
-                      <span className={styles.recommendedTag}>Recommended</span>
-                    )}
-                  </button>
-                );
-              })}
+                      {recommended && (
+                        <span className={styles.recommendedTag}>Recommended</span>
+                      )}
+                    </button>
+                  );
+                })}
+            </div>
           </div>
+
+          <div className={styles.formSection}>
+            <label className={styles.sectionLabel}>Select Trailer (optional)</label>
+            <div className={styles.trailerGrid}>
+              <button
+                type="button"
+                className={`${styles.trailerOption} ${
+                  selectedTrailerId === null ? styles.trailerOptionSelected : ""
+                }`}
+                onClick={() => setSelectedTrailerId(null)}
+              >
+                <FontAwesomeIcon icon={faXmark} />
+                <div>No Trailer</div>
+              </button>
+              {availableTrailers.map((trailer) => (
+                <button
+                  type="button"
+                  key={trailer.id}
+                  className={`${styles.trailerOption} ${
+                    selectedTrailerId === trailer.id
+                      ? styles.trailerOptionSelected
+                      : ""
+                  }`}
+                  onClick={() => setSelectedTrailerId(trailer.id)}
+                >
+                  <FontAwesomeIcon icon={faTrailer} />
+                  <div>
+                    <div className={styles.trailerOptionUnit}>
+                      {trailer.unitNumber}
+                    </div>
+                    <div className={styles.trailerOptionType}>
+                      {trailer.equipmentType || "Trailer"}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className={styles.formRow}>
+            <div className={styles.formGroup}>
+              <label>Odometer (miles)</label>
+              <input
+                type="number"
+                value={odometerStart}
+                onChange={(e) => setOdometerStart(e.target.value)}
+                placeholder="Enter odometer"
+                className={styles.formInput}
+              />
+            </div>
+            <div className={styles.formGroup}>
+              <label>Fuel Level</label>
+              <select
+                value={fuelLevelStart}
+                onChange={(e) => setFuelLevelStart(e.target.value)}
+                className={styles.formSelect}
+              >
+                <option value="">Select fuel level</option>
+                <option value="Full">Full</option>
+                <option value="3/4">3/4</option>
+                <option value="1/2">1/2</option>
+                <option value="1/4">1/4</option>
+                <option value="Empty">Empty</option>
+              </select>
+            </div>
+          </div>
+
           <div className={styles.formActions}>
             <button
               type="button"
@@ -795,80 +1082,429 @@ export default function HandoffView() {
               <FontAwesomeIcon icon={faCircleCheck} />
               {busyId === checkInDriver?.id
                 ? "Checking in…"
-                : "Check In & Assign Truck"}
+                : "Check In & Assign"}
             </button>
           </div>
         </form>
       </Modal>
 
-      {/* ── Manage shift modal — the 3-way choice ────────────────────── */}
+      {/* ── Return/End shift modal ── */}
       <Modal
         isOpen={!!endShiftDriver}
         onClose={() => setEndShiftDriver(null)}
-        title={`Manage Shift — ${endShiftDriver?.name || ""}`}
-        size="sm"
+        title={`Return Equipment — ${endShiftDriver?.name || ""}`}
+        size="md"
       >
         <div className={styles.endShiftContent}>
-          <p>What would you like to do?</p>
           {error && <div className={styles.formError}>{error}</div>}
 
-          <button
-            className={styles.endShiftOption}
-            onClick={() => backToAvailable(endShiftDriver)}
-            disabled={
-              busyId === endShiftDriver?.id ||
-              endShiftDriver?.status === "Available"
-            }
-          >
-            <FontAwesomeIcon icon={faRotateLeft} />
-            <div>
-              <div className={styles.endShiftOptionTitle}>
-                Make Available Again
-              </div>
-              <div className={styles.endShiftOptionSub}>
-                {endShiftDriver?.status === "Available"
-                  ? "Already available."
-                  : "Ends the break early — truck stays assigned."}
-              </div>
-            </div>
-          </button>
+          <div className={styles.formGroup}>
+            <label>Return Reason</label>
+            <select
+              value={endShiftData.returnReason}
+              onChange={(e) =>
+                setEndShiftData({ ...endShiftData, returnReason: e.target.value })
+              }
+              className={styles.formSelect}
+            >
+              {RETURN_REASONS.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          <button
-            className={styles.endShiftOption}
-            onClick={() => startBreak(endShiftDriver)}
-            disabled={busyId === endShiftDriver?.id}
-          >
-            <FontAwesomeIcon icon={faClock} />
-            <div>
-              <div className={styles.endShiftOptionTitle}>30-Minute Break</div>
-              <div className={styles.endShiftOptionSub}>
-                Truck stays assigned to this driver.
-              </div>
-            </div>
-          </button>
+          <div className={styles.formGroup}>
+            <label>Additional Note</label>
+            <input
+              type="text"
+              value={endShiftData.returnNote}
+              onChange={(e) =>
+                setEndShiftData({ ...endShiftData, returnNote: e.target.value })
+              }
+              placeholder="Any notes about the return?"
+              className={styles.formInput}
+            />
+          </div>
 
-          <button
-            className={`${styles.endShiftOption} ${styles.endShiftOptionDanger}`}
-            onClick={() => sendHome(endShiftDriver)}
-            disabled={busyId === endShiftDriver?.id}
-          >
-            <FontAwesomeIcon icon={faHouse} />
-            <div>
-              <div className={styles.endShiftOptionTitle}>Send Home</div>
-              <div className={styles.endShiftOptionSub}>
-                Driver goes Off Duty; truck is reserved for 1 hour before
-                it&apos;s available again.
-              </div>
+          <div className={styles.formRow}>
+            <div className={styles.formGroup}>
+              <label>End Odometer (miles)</label>
+              <input
+                type="number"
+                value={endShiftData.odometerEnd}
+                onChange={(e) =>
+                  setEndShiftData({ ...endShiftData, odometerEnd: e.target.value })
+                }
+                placeholder="Enter ending odometer"
+                className={styles.formInput}
+              />
             </div>
-          </button>
+            <div className={styles.formGroup}>
+              <label>End Fuel Level</label>
+              <select
+                value={endShiftData.fuelLevelEnd}
+                onChange={(e) =>
+                  setEndShiftData({ ...endShiftData, fuelLevelEnd: e.target.value })
+                }
+                className={styles.formSelect}
+              >
+                <option value="">Select fuel level</option>
+                <option value="Full">Full</option>
+                <option value="3/4">3/4</option>
+                <option value="1/2">1/2</option>
+                <option value="1/4">1/4</option>
+                <option value="Empty">Empty</option>
+              </select>
+            </div>
+          </div>
 
-          <button
-            type="button"
-            className={styles.cancelBtn}
-            onClick={() => setEndShiftDriver(null)}
-          >
-            Cancel
-          </button>
+          <div className={styles.damageSection}>
+            <label className={styles.checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={endShiftData.damageReported}
+                onChange={(e) =>
+                  setEndShiftData({
+                    ...endShiftData,
+                    damageReported: e.target.checked,
+                    damageDescription: e.target.checked
+                      ? endShiftData.damageDescription
+                      : "",
+                  })
+                }
+              />
+              Report Damage
+            </label>
+            {endShiftData.damageReported && (
+              <div className={styles.formGroup}>
+                <label>Damage Description</label>
+                <textarea
+                  value={endShiftData.damageDescription}
+                  onChange={(e) =>
+                    setEndShiftData({
+                      ...endShiftData,
+                      damageDescription: e.target.value,
+                    })
+                  }
+                  placeholder="Describe any damage to the equipment"
+                  className={styles.formTextarea}
+                  rows={3}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className={styles.formActions}>
+            <button
+              type="button"
+              className={styles.cancelBtn}
+              onClick={() => setEndShiftDriver(null)}
+            >
+              Cancel
+            </button>
+            <button
+              className={styles.primaryButton}
+              onClick={() => returnEquipment(endShiftDriver)}
+              disabled={busyId === endShiftDriver?.id}
+            >
+              <FontAwesomeIcon icon={faCheck} />
+              {busyId === endShiftDriver?.id ? "Returning…" : "Return Equipment"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Swap modal ── */}
+      <Modal
+        isOpen={!!swapDriver}
+        onClose={() => setSwapDriver(null)}
+        title={`Swap Equipment — ${swapDriver?.name || ""}`}
+        size="lg"
+      >
+        <div className={styles.swapContent}>
+          {error && <div className={styles.formError}>{error}</div>}
+
+          <div className={styles.currentEquipment}>
+            <p className={styles.swapLabel}>Current Equipment:</p>
+            <div className={styles.swapCurrentChip}>
+              <FontAwesomeIcon icon={faTruckFront} />
+              {equipment.find((e) => e.id === swapData.currentEquipmentId)
+                ?.unitNumber || "Unknown"}
+            </div>
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>Swap Reason</label>
+            <select
+              value={swapData.reason}
+              onChange={(e) =>
+                setSwapData({ ...swapData, reason: e.target.value })
+              }
+              className={styles.formSelect}
+            >
+              {SWAP_REASONS.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>Reason Note</label>
+            <input
+              type="text"
+              value={swapData.reasonNote}
+              onChange={(e) =>
+                setSwapData({ ...swapData, reasonNote: e.target.value })
+              }
+              placeholder="Explain why equipment needs to be swapped"
+              className={styles.formInput}
+            />
+          </div>
+
+          <div className={styles.formSection}>
+            <label className={styles.sectionLabel}>Select Replacement Truck</label>
+            <div className={styles.truckGrid}>
+              {availableTrucks
+                .filter((t) => t.id !== swapData.currentEquipmentId)
+                .map((truck) => (
+                  <button
+                    type="button"
+                    key={truck.id}
+                    className={`${styles.truckOption} ${
+                      swapData.newEquipmentId === truck.id
+                        ? styles.truckOptionSelected
+                        : ""
+                    }`}
+                    onClick={() =>
+                      setSwapData({ ...swapData, newEquipmentId: truck.id })
+                    }
+                  >
+                    <FontAwesomeIcon
+                      icon={TYPE_ICONS[truck.equipmentType] || faTruck}
+                    />
+                    <div>
+                      <div className={styles.truckOptionUnit}>
+                        {truck.unitNumber}
+                      </div>
+                      <div className={styles.truckOptionType}>
+                        {truck.equipmentType}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              {availableTrucks.filter((t) => t.id !== swapData.currentEquipmentId)
+                .length === 0 && (
+                <div className={styles.emptyState}>
+                  No other trucks available for swap
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className={styles.formSection}>
+            <label className={styles.sectionLabel}>Trailer (optional)</label>
+            <div className={styles.trailerGrid}>
+              <button
+                type="button"
+                className={`${styles.trailerOption} ${
+                  swapData.trailerId === "" ? styles.trailerOptionSelected : ""
+                }`}
+                onClick={() => setSwapData({ ...swapData, trailerId: "" })}
+              >
+                <FontAwesomeIcon icon={faXmark} />
+                <div>No Trailer</div>
+              </button>
+              {availableTrailers.map((trailer) => (
+                <button
+                  type="button"
+                  key={trailer.id}
+                  className={`${styles.trailerOption} ${
+                    swapData.trailerId === trailer.id
+                      ? styles.trailerOptionSelected
+                      : ""
+                  }`}
+                  onClick={() => setSwapData({ ...swapData, trailerId: trailer.id })}
+                >
+                  <FontAwesomeIcon icon={faTrailer} />
+                  <div>
+                    <div className={styles.trailerOptionUnit}>
+                      {trailer.unitNumber}
+                    </div>
+                    <div className={styles.trailerOptionType}>
+                      {trailer.equipmentType || "Trailer"}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className={styles.formActions}>
+            <button
+              type="button"
+              className={styles.cancelBtn}
+              onClick={() => setSwapDriver(null)}
+            >
+              Cancel
+            </button>
+            <button
+              className={styles.primaryButton}
+              onClick={confirmSwap}
+              disabled={!swapData.newEquipmentId || busyId === swapDriver?.id}
+            >
+              <FontAwesomeIcon icon={faArrowsRotate} />
+              {busyId === swapDriver?.id ? "Swapping…" : "Confirm Swap"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── History modal ── */}
+      <Modal
+        isOpen={showHistory}
+        onClose={() => setShowHistory(false)}
+        title={`Equipment History — ${selectedDriverHistory?.name || ""}`}
+        size="lg"
+      >
+        <div className={styles.historyContent}>
+          <div className={styles.historyRangeToggle}>
+            {HISTORY_RANGES.map((r) => (
+              <button
+                type="button"
+                key={r.value}
+                className={`${styles.historyRangeBtn} ${
+                  historyRange === r.value ? styles.historyRangeBtnActive : ""
+                }`}
+                onClick={() => switchHistoryRange(r.value)}
+                disabled={historyLoading}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+
+          {historyLoading && (
+            <div className={styles.emptyState}>Loading history…</div>
+          )}
+
+          {!historyLoading && historyData && (
+            <>
+              <div className={styles.historySummary}>
+                <div className={styles.historyStat}>
+                  <span className={styles.historyStatValue}>
+                    {historyData.summary?.totalHandoffs || 0}
+                  </span>
+                  <span className={styles.historyStatLabel}>
+                    {historyRange === "all" ? "Total Handoffs" : "Handoffs"}
+                  </span>
+                </div>
+                <div className={styles.historyStat}>
+                  <span className={styles.historyStatValue}>
+                    {historyData.summary?.uniqueEquipmentDriven || 0}
+                  </span>
+                  <span className={styles.historyStatLabel}>Unique Equipment</span>
+                </div>
+                <div className={styles.historyStat}>
+                  <span className={styles.historyStatValue}>
+                    {historyData.summary?.activeHandoffs || 0}
+                  </span>
+                  <span className={styles.historyStatLabel}>Active</span>
+                </div>
+              </div>
+
+              <div className={styles.historyList}>
+                {historyData.history?.length === 0 && (
+                  <div className={styles.emptyState}>
+                    {historyRange === "all"
+                      ? "No equipment history found for this driver."
+                      : "No equipment checked out in this window."}
+                  </div>
+                )}
+                {historyData.history?.map((handoff) => (
+                  <div key={handoff.id} className={styles.historyItem}>
+                    <div className={styles.historyItemHeader}>
+                      <div className={styles.historyItemAction}>
+                        {handoff.action === "CHECKOUT" && (
+                          <span className={styles.actionCheckout}>
+                            <FontAwesomeIcon icon={faKey} /> Checked Out
+                          </span>
+                        )}
+                        {handoff.action === "SWAP" && (
+                          <span className={styles.actionSwap}>
+                            <FontAwesomeIcon icon={faArrowsRotate} /> Swapped
+                          </span>
+                        )}
+                        {handoff.action === "RETURN" && (
+                          <span className={styles.actionReturn}>
+                            <FontAwesomeIcon icon={faHouse} /> Returned
+                          </span>
+                        )}
+                        {handoff.action === "REPLACE" && (
+                          <span className={styles.actionReplace}>
+                            <FontAwesomeIcon icon={faRotateLeft} /> Replaced
+                          </span>
+                        )}
+                      </div>
+                      <div className={styles.historyItemTime}>
+                        <FontAwesomeIcon icon={faClock} />
+                        {formatTime(handoff.checkOutTime)}
+                      </div>
+                    </div>
+
+                    <div className={styles.historyItemBody}>
+                      <div className={styles.historyItemEquipment}>
+                        <FontAwesomeIcon icon={faTruckFront} />
+                        {handoff.equipment?.unitNumber || "Unknown"}
+                        {handoff.replacedEquipment && (
+                          <span className={styles.historySwapArrow}>
+                            → {handoff.replacedEquipment.unitNumber}
+                          </span>
+                        )}
+                      </div>
+                      {handoff.trailer && (
+                        <div className={styles.historyItemTrailer}>
+                          <FontAwesomeIcon icon={faTrailer} />
+                          Trailer: {handoff.trailer.unitNumber}
+                        </div>
+                      )}
+                      {handoff.reason && (
+                        <div className={styles.historyItemReason}>
+                          <span className={styles.historyItemReasonLabel}>
+                            Reason:
+                          </span>
+                          {handoff.reason.replace("_", " ")}
+                          {handoff.reasonNote && ` — ${handoff.reasonNote}`}
+                        </div>
+                      )}
+                      {handoff.isActive === false && (
+                        <div className={styles.historyItemReturned}>
+                          <FontAwesomeIcon icon={faCheck} />
+                          Returned at {formatTime(handoff.returnTime)}
+                        </div>
+                      )}
+                      {handoff.damageReported && (
+                        <div className={styles.historyItemDamage}>
+                          <FontAwesomeIcon icon={faTriangleExclamation} />
+                          Damage reported: {handoff.damageDescription}
+                        </div>
+                      )}
+                      {handoff.odometerStart && handoff.odometerEnd && (
+                        <div className={styles.historyItemMileage}>
+                          <FontAwesomeIcon icon={faClock} />
+                          {handoff.odometerEnd - handoff.odometerStart} miles
+                          ({handoff.odometerStart} → {handoff.odometerEnd})
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </Modal>
     </div>

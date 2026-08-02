@@ -1,3 +1,4 @@
+//src/api/api.js
 const isLocal = typeof window !== 'undefined' &&
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
@@ -113,6 +114,18 @@ export const uploadDriverLicensePhoto = async (id, file) => {
   return data;
 };
 
+// ── DRIVER HISTORY ──────────────────────────────────────────────────────────
+/** Get complete equipment history for a driver */
+export const getDriverHistory = (id, params = {}) => {
+  const query = new URLSearchParams(params).toString();
+  return request(`/drivers/${id}/history${query ? `?${query}` : ''}`);
+};
+
+/** Get active handoffs for a driver */
+export const getActiveHandoffs = (driverId) => {
+  return request(`/drivers/${driverId}/history?limit=10&includeActive=true`);
+};
+
 // ── EQUIPMENT ─────────────────────────────────────────────────────────────────
 export const getEquipment = (type) => request(`/equipment${type ? `?type=${type}` : ''}`);
 export const createEquipment = (body) => request('/equipment', { method: 'POST', body: JSON.stringify(body) });
@@ -122,6 +135,27 @@ export const updateEquipment = (id, body) => request(`/equipment/${id}`, { metho
 // general PUT above strips null values and can't clear assignedDriverId.
 export const assignEquipment = (id, body) => request(`/equipment/${id}/assign`, { method: 'PATCH', body: JSON.stringify(body) });
 export const deleteEquipment = (id) => request(`/equipment/${id}`, { method: 'DELETE' });
+
+// ── EQUIPMENT HISTORY ───────────────────────────────────────────────────────
+/** Get complete history for a specific equipment unit */
+export const getEquipmentHistory = (equipmentId, params = {}) => {
+  const query = new URLSearchParams(params).toString();
+  return request(`/equipment/history/equipment/${equipmentId}${query ? `?${query}` : ''}`);
+};
+
+/** Get equipment history for a specific driver */
+export const getEquipmentHistoryByDriver = (driverId, params = {}) => {
+  const query = new URLSearchParams(params).toString();
+  return request(`/equipment/history/driver/${driverId}${query ? `?${query}` : ''}`);
+};
+
+/** Swap equipment mid-shift */
+export const swapEquipment = (equipmentId, data) => {
+  return request(`/equipment/${equipmentId}/swap`, { 
+    method: 'POST', 
+    body: JSON.stringify(data) 
+  });
+};
 
 // ── AIRLINES ──────────────────────────────────────────────────────────────────
 export const getAirlines = () => request('/airlines');
@@ -183,3 +217,7 @@ export const updateTrip = (id, body) => request(`/dispatch/${id}`, { method: 'PU
 export const startTrip = (id, body = {}) => request(`/dispatch/${id}/start`, { method: 'PATCH', body: JSON.stringify(body) });
 export const finishTrip = (id, body = {}) => request(`/dispatch/${id}/finish`, { method: 'PATCH', body: JSON.stringify(body) });
 export const deleteTrip = (id) => request(`/dispatch/${id}`, { method: 'DELETE' });
+// One truck/driver can't take the whole manifest — creates a new linked Trip
+// (parentTripId = id) with a backup driver/truck/trailer, moving or splitting
+// the selected AWBs over. Returns { parentTrip, backupTrip }, both populated.
+export const createTripBackup = (id, body) => request(`/dispatch/${id}/backups`, { method: 'POST', body: JSON.stringify(body) });

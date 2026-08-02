@@ -33,6 +33,9 @@ import {
   faHeart,
   faGraduationCap,
   faFileImage,
+  faTable,
+  faThLarge,
+  faChevronDown,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   getDrivers,
@@ -46,6 +49,7 @@ import {
 } from "../../api/api.js";
 import Modal from "../../components/Modal/Modal.jsx";
 import styles from "./DriversView.module.css";
+import tableStyles from "./DriversView.table.module.css";
 
 const INITIAL_FORM = {
   name: "",
@@ -261,6 +265,23 @@ export default function DriversView() {
   const [photoPreview, setPhotoPreview] = useState("");
   const [licensePhotoFile, setLicensePhotoFile] = useState(null);
   const [licensePhotoPreview, setLicensePhotoPreview] = useState("");
+
+  const VIEW_KEY = "driversViewMode";
+  const [viewMode, setViewMode] = useState(() => {
+    try { return localStorage.getItem(VIEW_KEY) || "cards"; } catch { return "cards"; }
+  });
+  const switchView = (mode) => {
+    setViewMode(mode);
+    try { localStorage.setItem(VIEW_KEY, mode); } catch {}
+  };
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
+  const toggleExpanded = (id) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   const load = useCallback(async () => {
     try {
@@ -604,10 +625,24 @@ export default function DriversView() {
             {drivers.length} driver{drivers.length !== 1 ? "s" : ""} registered
           </p>
         </div>
-        <button className={styles.addBtn} onClick={openAdd} id="add-driver-btn">
-          <FontAwesomeIcon icon={faPlus} />
-          Add Driver
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div className={tableStyles.viewToggle} role="group" aria-label="View mode">
+            <button type="button"
+              className={`${tableStyles.toggleBtn} ${viewMode === "cards" ? tableStyles.toggleBtnActive : ""}`}
+              onClick={() => switchView("cards")} title="Card view" aria-pressed={viewMode === "cards"}>
+              <FontAwesomeIcon icon={faThLarge} /><span className={tableStyles.toggleLabel}>Cards</span>
+            </button>
+            <button type="button"
+              className={`${tableStyles.toggleBtn} ${viewMode === "table" ? tableStyles.toggleBtnActive : ""}`}
+              onClick={() => switchView("table")} title="Table view" aria-pressed={viewMode === "table"}>
+              <FontAwesomeIcon icon={faTable} /><span className={tableStyles.toggleLabel}>Table</span>
+            </button>
+          </div>
+          <button className={styles.addBtn} onClick={openAdd} id="add-driver-btn">
+            <FontAwesomeIcon icon={faPlus} />
+            Add Driver
+          </button>
+        </div>
       </div>
 
       <div className={styles.statsBar}>
@@ -701,6 +736,168 @@ export default function DriversView() {
 
       {loading ? (
         <div className={styles.loading}>Loading drivers...</div>
+      ) : viewMode === "table" ? (
+        <div className={tableStyles.tableWrap}>
+          <div className={tableStyles.tableScroll}>
+            <table className={tableStyles.table}>
+              <thead>
+                <tr>
+                  <th className={tableStyles.thExpand} aria-hidden="true" />
+                  <th>Driver</th>
+                  <th>Status</th>
+                  <th>Contact</th>
+                  <th>License</th>
+                  <th>Certs</th>
+                  <th>Schedule</th>
+                  <th>Performance</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredDrivers.length === 0 ? (
+                  <tr className={tableStyles.emptyRow}><td colSpan={9}>No drivers found matching your criteria.</td></tr>
+                ) : filteredDrivers.map((driver) => {
+                  const licenseWarn = expiryClass(driver.licenseExpiration);
+                  const medWarn = expiryClass(driver.medicalCertExpiration);
+                  const statusClass = driver.status?.replace(" ", "_") || "Unknown";
+                  const isOpen = expandedIds.has(driver.id);
+                  const initials = (driver.name || "").split(" ").map(p => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+                  return (
+                    <React.Fragment key={driver.id}>
+                      <tr
+                        className={`${tableStyles.tr} ${isOpen ? tableStyles.trOpen : ""}`}
+                        onClick={() => toggleExpanded(driver.id)}
+                      >
+                        <td className={tableStyles.tdExpand}>
+                          <FontAwesomeIcon icon={faChevronDown} className={tableStyles.expandChevron} />
+                        </td>
+                        <td>
+                          <div className={tableStyles.driverCell}>
+                            {driver.photo ? (
+                              <img src={driver.photo} alt="" className={tableStyles.avatarImg} />
+                            ) : (
+                              <div className={tableStyles.avatar}>{initials}</div>
+                            )}
+                            <div>
+                              <div className={tableStyles.driverName}>
+                                {driver.name}
+                                {driver.isLead && <FontAwesomeIcon icon={faStar} className={tableStyles.starIcon} />}
+                              </div>
+                              <div className={tableStyles.driverId}>{driver.employeeId || driver.id?.slice(0, 8)}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <span className={`${tableStyles.statusBadge} ${tableStyles[`status_${statusClass}`] || ""}`}>
+                            {driver.status || "—"}
+                          </span>
+                        </td>
+                        <td className={tableStyles.contact}>
+                          {driver.phone || driver.email || "—"}
+                        </td>
+                        <td className={tableStyles.licenseCell}>
+                          <span className={tableStyles.licenseClass}>Class {driver.licenseClass || "—"}</span>
+                          {driver.licenseExpiration && (
+                            <div className={`${tableStyles.compTag} ${
+                              licenseWarn === "expired" ? tableStyles.compExpired
+                              : licenseWarn === "warn" ? tableStyles.compWarn : ""
+                            }`}>
+                              Lic {driver.licenseExpiration}
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          <div className={tableStyles.certs}>
+                            {driver.hazmatCertified && <span className={`${tableStyles.certBadge} ${tableStyles.certHazmat}`}>Hazmat</span>}
+                            {driver.trailerEndorsement && <span className={`${tableStyles.certBadge} ${tableStyles.certTrailer}`}>Trailer</span>}
+                            {driver.gdpCertified && <span className={`${tableStyles.certBadge} ${tableStyles.certGdp}`}>GDP</span>}
+                          </div>
+                        </td>
+                        <td className={tableStyles.schedule}>
+                          {driver.shiftStart && driver.shiftEnd
+                            ? `${driver.shiftStart}–${driver.shiftEnd}`
+                            : "—"}
+                        </td>
+                        <td>
+                          <div className={tableStyles.perf}>
+                            {driver.rating != null && (
+                              <span className={tableStyles.perfRating}>★ {driver.rating}</span>
+                            )}
+                            {driver.tripsCompleted != null && (
+                              <span>{driver.tripsCompleted} trips</span>
+                            )}
+                          </div>
+                        </td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <div className={tableStyles.actions}>
+                            <button className={`${tableStyles.actionBtn} ${tableStyles.editBtn}`} onClick={() => openEdit(driver)} title="Edit">
+                              <FontAwesomeIcon icon={faPencil} />
+                            </button>
+                            <button className={`${tableStyles.actionBtn} ${tableStyles.deleteBtn}`} onClick={() => setDeleteId(driver.id)} title="Delete">
+                              <FontAwesomeIcon icon={faTrash} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr className={tableStyles.trExpandRow}>
+                        <td colSpan={9} className={tableStyles.tdExpandContent}>
+                          <div className={`${tableStyles.expandPanel} ${isOpen ? tableStyles.expandPanelOpen : ""}`}>
+                            <div className={tableStyles.expandPanelInner}>
+                              <div className={tableStyles.expandGrid}>
+                                {driver.email && (
+                                  <div className={tableStyles.expandItem}>
+                                    <span className={tableStyles.expandLabel}>Email</span>
+                                    <span className={tableStyles.expandValue}>{driver.email}</span>
+                                  </div>
+                                )}
+                                {driver.phone && (
+                                  <div className={tableStyles.expandItem}>
+                                    <span className={tableStyles.expandLabel}>Phone</span>
+                                    <span className={tableStyles.expandValue}>{driver.phone}</span>
+                                  </div>
+                                )}
+                                {driver.medicalCertExpiration && (
+                                  <div className={tableStyles.expandItem}>
+                                    <span className={tableStyles.expandLabel}>Medical Cert</span>
+                                    <span className={tableStyles.expandValue}>
+                                      {driver.medicalCertExpiration}
+                                      {medWarn === "expired" ? " (expired)" : medWarn === "warn" ? " (expiring)" : ""}
+                                    </span>
+                                  </div>
+                                )}
+                                {driver.vehicleTypes?.length > 0 && (
+                                  <div className={tableStyles.expandItem}>
+                                    <span className={tableStyles.expandLabel}>Vehicle Types</span>
+                                    <span className={tableStyles.expandValue}>{driver.vehicleTypes.join(", ")}</span>
+                                  </div>
+                                )}
+                                {driver.daysOff?.length > 0 && (
+                                  <div className={tableStyles.expandItem}>
+                                    <span className={tableStyles.expandLabel}>Days Off</span>
+                                    <span className={tableStyles.expandValue}>{driver.daysOff.join(", ")}</span>
+                                  </div>
+                                )}
+                                {driver.hireDate && (
+                                  <div className={tableStyles.expandItem}>
+                                    <span className={tableStyles.expandLabel}>Hire Date</span>
+                                    <span className={tableStyles.expandValue}>{driver.hireDate}</span>
+                                  </div>
+                                )}
+                              </div>
+                              {driver.notes
+                                ? <p className={tableStyles.expandNotes}>{driver.notes}</p>
+                                : <p className={tableStyles.expandNotes}>No notes on file.</p>}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : (
         <div className={styles.grid}>
           {filteredDrivers.length === 0 ? (
@@ -1887,3 +2084,6 @@ export default function DriversView() {
     </div>
   );
 }
+
+
+

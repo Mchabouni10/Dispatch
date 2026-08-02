@@ -1,6 +1,7 @@
 /* ══════════════════════════════════════════════════════════════════════
-   PAGE / HEADER
+   EquipmentView – Card styles (next-level polish, consistent with Airlines)
    ══════════════════════════════════════════════════════════════════════ */
+
 .page {
   max-width: 1100px;
 }
@@ -11,17 +12,20 @@
   justify-content: space-between;
   margin-bottom: 24px;
 }
+
 .pageTitle {
   font-size: 26px;
   font-weight: 800;
   color: var(--text-primary);
   letter-spacing: -0.5px;
 }
+
 .pageSub {
   color: var(--text-secondary);
   font-size: 13px;
   margin-top: 4px;
 }
+
 .headerMeta {
   color: var(--text-muted);
   font-weight: 500;
@@ -30,8 +34,8 @@
 .addBtn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
+  gap: 24px;
+  padding: 12px 24px;
   background: linear-gradient(135deg, var(--accent), var(--accent-dark));
   color: white;
   border-radius: var(--radius-md);
@@ -39,25 +43,27 @@
   font-weight: 600;
   transition: var(--transition);
   box-shadow: 0 4px 12px rgba(79, 142, 247, 0.3);
+  border: none;
+  cursor: pointer;
 }
+
 .addBtn:hover {
   transform: translateY(-1px);
   box-shadow: 0 6px 20px rgba(79, 142, 247, 0.4);
 }
 
-/* ══════════════════════════════════════════════════════════════════════
-   TABS
-   ══════════════════════════════════════════════════════════════════════ */
+/* ── Tabs ── */
 .tabs {
   display: flex;
   gap: 6px;
   margin-bottom: 22px;
+  flex-wrap: wrap;
 }
 
 .tab {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 24px;
   padding: 10px 18px;
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -66,21 +72,26 @@
   font-size: 13.5px;
   font-weight: 500;
   transition: var(--transition);
+  cursor: pointer;
 }
+
 .tab svg {
   font-size: 12px;
   opacity: 0.85;
 }
+
 .tab:hover {
   background: var(--bg-card-hover);
   color: var(--text-primary);
   border-color: var(--border-hover);
 }
+
 .activeTab {
   background: var(--info-bg);
   border-color: rgba(79, 142, 247, 0.35);
   color: var(--accent);
 }
+
 .tabCount {
   background: rgba(255, 255, 255, 0.08);
   border-radius: 100px;
@@ -88,6 +99,7 @@
   font-size: 11px;
   font-weight: 700;
 }
+
 .activeTab .tabCount {
   background: rgba(79, 142, 247, 0.18);
 }
@@ -96,10 +108,10 @@
   background: var(--danger-bg);
   border: 1px solid rgba(255, 71, 87, 0.3);
   color: var(--danger);
-  padding: 12px 16px;
+  padding: 20px 24px;
   border-radius: var(--radius-md);
   font-size: 13px;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 
 .loading {
@@ -114,31 +126,34 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 24px;
   padding: 64px 24px;
   text-align: center;
   color: var(--text-secondary);
   font-size: 13px;
   border: 1px dashed var(--border);
   border-radius: var(--radius-lg);
+  grid-column: 1 / -1;
 }
+
 .empty svg {
   font-size: 26px;
   color: var(--text-muted);
   margin-bottom: 4px;
 }
+
 .empty strong {
   color: var(--text-primary);
   font-size: 14.5px;
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   EQUIPMENT GRID / CARDS
+   GRID / CARDS – elevated, status-aware
    ══════════════════════════════════════════════════════════════════════ */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
 }
 
 .card {
@@ -147,8 +162,9 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  transition: var(--transition);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
+
 .card::before {
   content: "";
   position: absolute;
@@ -156,39 +172,45 @@
   left: 0;
   right: 0;
   height: 3px;
+  z-index: 1;
 }
+
 .cardIn::before {
-  background: linear-gradient(90deg, var(--success), rgba(46, 204, 113, 0.25));
+  background: linear-gradient(90deg, var(--success), rgba(46, 204, 113, 0.2));
 }
+
 .cardOut::before {
-  background: linear-gradient(90deg, var(--danger), rgba(255, 71, 87, 0.25));
+  background: linear-gradient(90deg, var(--danger), rgba(255, 71, 87, 0.2));
 }
+
 .cardAssigned::before {
-  background: linear-gradient(90deg, var(--accent-cyan), rgba(0, 212, 255, 0.3));
+  background: linear-gradient(90deg, var(--accent-cyan), rgba(0, 212, 255, 0.25));
 }
+
 .cardCooldown::before {
-  background: linear-gradient(90deg, var(--warning), rgba(255, 179, 71, 0.3));
+  background: linear-gradient(90deg, var(--warning), rgba(255, 179, 71, 0.25));
 }
 
 .card:hover {
   transform: translateY(-3px);
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
   border-color: var(--border-hover);
 }
 
-/* ── Card header: icon + identity + actions ── */
+/* Header */
 .cardHeader {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px;
+  gap: 24px;
+  padding: 24px;
   border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
 }
 
 .unitIcon {
   position: relative;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
@@ -196,21 +218,28 @@
   font-size: 17px;
   flex-shrink: 0;
 }
+
 .unitIconPower {
-  background: var(--info-bg);
+  background: linear-gradient(135deg, var(--info-bg), rgba(79, 142, 247, 0.08));
   color: var(--accent);
-  box-shadow: 0 4px 12px rgba(79, 142, 247, 0.22);
+  box-shadow: 0 4px 14px rgba(79, 142, 247, 0.2);
+  border: 1px solid rgba(79, 142, 247, 0.15);
 }
+
 .unitIconTrailer {
-  background: var(--purple-bg);
+  background: linear-gradient(135deg, var(--purple-bg), rgba(185, 140, 255, 0.08));
   color: #b98cff;
-  box-shadow: 0 4px 12px rgba(185, 140, 255, 0.22);
+  box-shadow: 0 4px 14px rgba(185, 140, 255, 0.2);
+  border: 1px solid rgba(185, 140, 255, 0.15);
 }
+
 .unitIconReefer {
-  background: rgba(0, 212, 255, 0.1);
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.12), rgba(0, 212, 255, 0.04));
   color: var(--accent-cyan);
-  box-shadow: 0 4px 12px rgba(0, 212, 255, 0.22);
+  box-shadow: 0 4px 14px rgba(0, 212, 255, 0.2);
+  border: 1px solid rgba(0, 212, 255, 0.2);
 }
+
 .coldBadge {
   position: absolute;
   bottom: -3px;
@@ -219,25 +248,28 @@
   height: 17px;
   border-radius: 50%;
   background: var(--accent-cyan);
-  color: var(--bg-primary);
+  color: var(--bg-primary, #0a1220);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 8.5px;
   border: 2px solid var(--bg-card);
+  box-shadow: 0 2px 6px rgba(0, 212, 255, 0.4);
 }
 
 .unitInfo {
   flex: 1;
   min-width: 0;
 }
+
 .unitNumber {
   font-size: 15.5px;
   font-weight: 700;
   color: var(--text-primary);
-  font-family: monospace;
-  letter-spacing: 0.2px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.3px;
 }
+
 .unitModel {
   font-size: 12px;
   color: var(--text-secondary);
@@ -252,6 +284,7 @@
   gap: 6px;
   flex-shrink: 0;
 }
+
 .editBtn,
 .deleteBtn {
   width: 30px;
@@ -262,22 +295,29 @@
   justify-content: center;
   font-size: 12px;
   transition: var(--transition);
-  background: var(--bg-card);
+  background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border);
   color: var(--text-secondary);
+  cursor: pointer;
 }
+
 .editBtn:hover {
   background: var(--info-bg);
   border-color: var(--accent);
   color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(79, 142, 247, 0.25);
 }
+
 .deleteBtn:hover {
   background: var(--danger-bg);
   border-color: var(--danger);
   color: var(--danger);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 71, 87, 0.25);
 }
 
-/* ── Card body: status, meta, compliance, notes ── */
+/* Body */
 .cardBody {
   padding: 13px 16px 15px;
   display: flex;
@@ -301,6 +341,7 @@
   font-size: 11px;
   font-weight: 600;
 }
+
 .statusPill::before {
   content: "";
   width: 6px;
@@ -308,23 +349,34 @@
   border-radius: 50%;
   flex-shrink: 0;
 }
+
 .statusIn {
   background: rgba(46, 204, 113, 0.12);
   color: var(--success);
   border: 1px solid rgba(46, 204, 113, 0.3);
 }
+
 .statusIn::before {
   background: var(--success);
-  box-shadow: 0 0 6px rgba(46, 204, 113, 0.7);
+  box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.55);
+  animation: pulseStatus 1.8s ease-in-out infinite;
 }
+
 .statusOut {
   background: var(--danger-bg);
   color: var(--danger);
   border: 1px solid rgba(255, 71, 87, 0.3);
 }
+
 .statusOut::before {
   background: var(--danger);
-  box-shadow: 0 0 6px rgba(255, 71, 87, 0.7);
+  box-shadow: 0 0 6px rgba(255, 71, 87, 0.5);
+}
+
+@keyframes pulseStatus {
+  0%   { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.55); }
+  70%  { box-shadow: 0 0 0 5px rgba(46, 204, 113, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
 }
 
 .metaTag {
@@ -335,10 +387,11 @@
   border-radius: 100px;
   font-size: 10.5px;
   font-weight: 500;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
   color: var(--text-muted);
 }
+
 .metaTag svg {
   font-size: 9.5px;
   opacity: 0.8;
@@ -363,24 +416,27 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  padding: 8px 11px;
+  gap: 24px;
+  padding: 20px 24px;
   border-radius: var(--radius-sm);
-  background: rgba(0, 212, 255, 0.1);
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(0, 212, 255, 0.04));
   border: 1px solid rgba(0, 212, 255, 0.28);
   color: var(--accent-cyan);
   font-size: 12px;
   font-weight: 600;
 }
+
 .handoffChip svg {
   font-size: 11px;
 }
+
 .handoffLabel {
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.35px;
   font-size: 10px;
   opacity: 0.9;
 }
+
 .handoffDriver {
   display: inline-flex;
   align-items: center;
@@ -394,9 +450,9 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 7px 11px;
+  padding: 7px 12px;
   border-radius: var(--radius-sm);
-  background: var(--warning-bg);
+  background: linear-gradient(135deg, var(--warning-bg), rgba(255, 179, 71, 0.06));
   border: 1px solid rgba(255, 179, 71, 0.3);
   color: var(--warning);
   font-size: 12px;
@@ -407,9 +463,9 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 10px;
+  padding: 5px 11px;
   border-radius: var(--radius-sm);
-  background: rgba(46, 204, 113, 0.08);
+  background: linear-gradient(135deg, rgba(46, 204, 113, 0.1), rgba(46, 204, 113, 0.04));
   border: 1px solid rgba(46, 204, 113, 0.22);
   color: var(--success);
   font-size: 11px;
@@ -421,17 +477,19 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 7px;
-  padding: 7px 11px;
+  padding: 7px 12px;
   border-radius: var(--radius-sm);
-  background: var(--purple-bg);
+  background: linear-gradient(135deg, var(--purple-bg), rgba(167, 139, 250, 0.06));
   border: 1px solid rgba(167, 139, 250, 0.3);
   color: var(--purple);
   font-size: 12px;
   font-weight: 600;
 }
+
 .leaseChipWarn {
   border-color: rgba(255, 179, 71, 0.4);
 }
+
 .leaseChipDate {
   display: inline-flex;
   align-items: center;
@@ -440,6 +498,7 @@
   color: var(--text-secondary);
   font-weight: 500;
 }
+
 .leaseChipWarn .leaseChipDate {
   color: var(--warning);
   font-weight: 600;
@@ -454,7 +513,7 @@
   background: var(--danger-bg);
   border: 1px solid rgba(255, 71, 87, 0.2);
   border-radius: var(--radius-sm);
-  padding: 7px 10px;
+  padding: 7px 11px;
   margin: 0;
 }
 
@@ -472,15 +531,18 @@
   border-radius: 100px;
   font-size: 10.5px;
   font-weight: 500;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
   color: var(--text-muted);
+  transition: border-color 0.15s ease;
 }
+
 .expiringSoon {
   background: rgba(255, 193, 7, 0.12);
   border-color: rgba(255, 193, 7, 0.4);
   color: var(--warning);
 }
+
 .expired {
   background: var(--danger-bg);
   border-color: rgba(255, 71, 87, 0.4);
@@ -491,32 +553,37 @@
   font-size: 11.5px;
   color: var(--text-muted);
   font-style: italic;
-  padding-left: 9px;
+  padding-left: 10px;
   border-left: 2px solid var(--border);
   line-height: 1.5;
+  margin: 0;
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   FORM (Add / Edit modal)
+   FORM
    ══════════════════════════════════════════════════════════════════════ */
 .form {
   display: flex;
   flex-direction: column;
 }
+
 .formGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: 24px;
+  margin-bottom: 24px;
 }
+
 .fullWidth {
   grid-column: 1 / -1;
 }
+
 .formGroup {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
+
 .label {
   font-size: 12px;
   font-weight: 600;
@@ -538,6 +605,7 @@
   padding-top: 14px;
   margin-top: 2px;
 }
+
 .sectionTitle svg {
   font-size: 11px;
 }
@@ -551,17 +619,21 @@
   font-size: 13.5px;
   transition: var(--transition);
 }
+
 .input:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(79, 142, 247, 0.1);
 }
+
 .input::placeholder {
   color: var(--text-muted);
 }
+
 select.input {
   cursor: pointer;
 }
+
 select.input option {
   background: #111c33;
 }
@@ -573,7 +645,7 @@ select.input option {
   padding: 10px 14px;
   border-radius: var(--radius-md);
   font-size: 13px;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 
 .formActions {
@@ -584,7 +656,7 @@ select.input option {
 }
 
 .cancelBtn {
-  padding: 10px 20px;
+  padding: 12px 24px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -592,7 +664,9 @@ select.input option {
   font-size: 13.5px;
   font-weight: 500;
   transition: var(--transition);
+  cursor: pointer;
 }
+
 .cancelBtn:hover {
   background: var(--bg-card-hover);
   color: var(--text-primary);
@@ -607,10 +681,14 @@ select.input option {
   font-weight: 600;
   transition: var(--transition);
   box-shadow: 0 4px 12px rgba(79, 142, 247, 0.3);
+  border: none;
+  cursor: pointer;
 }
+
 .saveBtn:hover:not(:disabled) {
   transform: translateY(-1px);
 }
+
 .saveBtn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -624,7 +702,10 @@ select.input option {
   font-size: 13.5px;
   font-weight: 600;
   transition: var(--transition);
+  border: none;
+  cursor: pointer;
 }
+
 .deleteConfirmBtn:hover {
   transform: translateY(-1px);
 }

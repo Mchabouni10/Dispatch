@@ -21,6 +21,7 @@ import {
   faHouse,
   faRotateLeft,
   faUserClock,
+  faUserPlus,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   createTrip,
@@ -37,6 +38,7 @@ import {
 } from "../../api/api.js";
 import Modal from "../../components/Modal/Modal.jsx";
 import StatusBadge from "../../components/StatusBadge/StatusBadge.jsx";
+import AddBackupDriverModal from "./AddBackupDriverModal.jsx";
 import styles from "./DispatchView.module.css";
 
 const KNOWN_AWB_PREFIXES = {
@@ -129,6 +131,54 @@ function awbLabel(shipment) {
     return list.length > 1 ? `${list[0]} +${list.length - 1} more` : list[0];
   }
   return "AWB pending";
+}
+
+/**
+ * Pieces / weight THIS trip actually carries for a shipment.
+ * Prefer backend `allocation` (from TripShipmentSplit enrichment).
+ * Fall back to trip.shipmentSplits, then full AWB totals if unsplit.
+ *
+ * Weight is proportional:
+ *   round((piecesOnTrip / totalPieces) * totalWeight, 2)
+ */
+function proportionalWeight(piecesOnTrip, totalPieces, totalWeight) {
+  if (!totalPieces || totalPieces <= 0) return 0;
+  return Math.round((piecesOnTrip / totalPieces) * totalWeight * 100) / 100;
+}
+
+function tripAllocation(shipment, trip) {
+  if (shipment?.allocation) {
+    return {
+      pieces: Number(shipment.allocation.pieces) || 0,
+      weight: Number(shipment.allocation.weight) || 0,
+      isPartial: !!shipment.allocation.isPartial,
+    };
+  }
+
+  const totalPieces = Number(shipment?.pieces) || 0;
+  const totalWeight = Number(shipment?.weight) || 0;
+
+  const split = (trip?.shipmentSplits || []).find(
+    (sp) => sp.shipmentId === shipment?.id,
+  );
+  if (split) {
+    const pcs = Number(split.pieces) || 0;
+    const w =
+      Number.isFinite(Number(split.weight)) && Number(split.weight) > 0
+        ? Number(split.weight)
+        : proportionalWeight(pcs, totalPieces, totalWeight);
+    return {
+      pieces: pcs,
+      weight: w,
+      isPartial: totalPieces > 0 && pcs < totalPieces,
+    };
+  }
+
+  return {
+    pieces: totalPieces,
+    weight: totalWeight,
+    isPartial: false,
+  };
 }
 
 function cutoffState(shipment) {
@@ -432,6 +482,9 @@ export default function DispatchView() {
   // After cargo handoff: ready for next run | 30-min break | end of shift
   const [handoffAction, setHandoffAction] = useState("available");
   const [handoffSaving, setHandoffSaving] = useState(false);
+
+  // One truck/driver can't fit the whole manifest — add a linked backup run
+  const [backupModalOpen, setBackupModalOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -1079,27 +1132,33 @@ export default function DispatchView() {
                   <RunTimeline trip={trip} />
 
                   <div className={styles.manifest}>
-                    {(trip.shipments || []).map((shipment) => (
-                      <div key={shipment.id} className={styles.manifestRow}>
-                        <div>
-                          <span className={styles.direction}>
-                            {shipment.type}
-                          </span>
-                          <strong>{awbLabel(shipment)}</strong>
-                          <span>
-                            {shipment.pieces} pcs · {shipment.weight}{" "}
-                            {shipment.weightUnit || "lb"}
-                            {shipment.airline?.name
-                              ? ` · ${shipment.airline.name}`
-                              : ""}
-                            {shipment.doorNumber
-                              ? ` · Door ${shipment.doorNumber}`
-                              : ""}
-                          </span>
+                    {(trip.shipments || []).map((shipment) => {
+                      const alloc = tripAllocation(shipment, trip);
+                      return (
+                        <div key={shipment.id} className={styles.manifestRow}>
+                          <div>
+                            <span className={styles.direction}>
+                              {shipment.type}
+                            </span>
+                            <strong>{awbLabel(shipment)}</strong>
+                            <span>
+                              {alloc.pieces} pcs · {alloc.weight}{" "}
+                              {shipment.weightUnit || "lb"}
+                              {alloc.isPartial
+                                ? ` · of ${shipment.pieces} total`
+                                : ""}
+                              {shipment.airline?.name
+                                ? ` · ${shipment.airline.name}`
+                                : ""}
+                              {shipment.doorNumber
+                                ? ` · Door ${shipment.doorNumber}`
+                                : ""}
+                            </span>
+                          </div>
+                          <Lane shipment={shipment} compact />
                         </div>
-                        <Lane shipment={shipment} compact />
-                      </div>
-                    ))}
+                      );
+                    })}
                     {(!trip.shipments || trip.shipments.length === 0) && (
                       <div className={styles.manifestRow}>
                         <div>
@@ -1480,6 +1539,16 @@ export default function DispatchView() {
           </div>
 
           <div className={styles.formActions}>
+            {editingTrip &&
+              ["Scheduled", "En Route"].includes(editingTrip.status) && (
+                <button
+                  type="button"
+                  className={styles.cancel}
+                  onClick={() => setBackupModalOpen(true)}
+                >
+                  <FontAwesomeIcon icon={faUserPlus} /> Add backup driver
+                </button>
+              )}
             <button
               type="button"
               className={styles.cancel}
@@ -1499,6 +1568,36 @@ export default function DispatchView() {
           </div>
         </form>
       </Modal>
+
+      {/* ── Add backup driver modal ─────────────────────────────────── */}
+      {editingTrip && (
+        <AddBackupDriverModal
+          open={backupModalOpen}
+          parentTrip={editingTrip}
+          manifestShipments={editingTrip.shipments || []}
+          awbLabel={awbLabel}
+          unitAssignedToDriver={unitAssignedToDriver}
+          driverOptions={availableDrivers.filter(
+            (d) => d.id !== (editingTrip.driverId || editingTrip.driver?.id),
+          )}
+          driverOptionLabel={driverOptionLabel}
+          truckOptions={trucks.filter(
+            (t) => t.id !== (editingTrip.truckId || editingTrip.truck?.id),
+          )}
+          truckOptionLabel={truckOptionLabel}
+          trailerOptions={trailers.filter(
+            (t) => t.id !== (editingTrip.trailerId || editingTrip.trailer?.id),
+          )}
+          onClose={() => setBackupModalOpen(false)}
+          onSaved={async () => {
+            setBackupModalOpen(false);
+            setModalOpen(false);
+            setEditingTrip(null);
+            setForm(EMPTY_FORM);
+            await load();
+          }}
+        />
+      )}
 
       {/* ── Confirm handoff modal ───────────────────────────────────── */}
       <Modal

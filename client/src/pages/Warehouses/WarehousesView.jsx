@@ -1,9 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faPencil, faTrash, faWarehouse, faLocationDot } from '@fortawesome/free-solid-svg-icons';
+import {
+  faPlus, faPencil, faTrash, faLocationDot,
+  faThLarge, faTable, faMagnifyingGlass,
+  faChevronDown, faSort, faSortUp, faSortDown, faXmark,
+} from '@fortawesome/free-solid-svg-icons';
 import { getWarehouses, createWarehouse, updateWarehouse, deleteWarehouse } from '../../api/api.js';
 import Modal from '../../components/Modal/Modal.jsx';
 import styles from './WarehousesView.module.css';
+import tableStyles from './WarehousesView.table.module.css';
 
 const DAYS = [
   { key: 'MON', label: 'M', full: 'Mon' },
@@ -18,6 +23,8 @@ const DAY_ORDER = DAYS.map(d => d.key);
 const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI'];
 
 const INITIAL = { name: '', address: '', contactPhone: '', is24Hours: false, daysOpen: WEEKDAYS, openTime: '08:00', closeTime: '17:00', notes: '' };
+
+const VIEW_KEY = 'warehousesView.viewMode';
 
 // Collapses a day array into a friendly label: "Every day", "Weekdays", "Mon–Sat", or a list.
 function formatDays(daysOpen = []) {
@@ -39,6 +46,23 @@ function formatHours(w) {
   return [days, time].filter(Boolean).join(' • ');
 }
 
+// Sort key derived per-column so clicking a header sorts on something meaningful,
+// not just the raw field (e.g. Hours sorts 24/7 facilities first, then by open time).
+function sortValue(w, key) {
+  switch (key) {
+    case 'name': return (w.name || '').toLowerCase();
+    case 'address': return (w.address || '').toLowerCase();
+    case 'hours': return w.is24Hours ? '' : `z${w.openTime || ''}`;
+    default: return '';
+  }
+}
+
+const COLUMNS = [
+  { key: 'name', label: 'Warehouse' },
+  { key: 'address', label: 'Address' },
+  { key: 'hours', label: 'Hours' },
+];
+
 export default function WarehousesView() {
   const [warehouses, setWarehouses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,6 +73,13 @@ export default function WarehousesView() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const [viewMode, setViewMode] = useState(() => {
+    try { return localStorage.getItem(VIEW_KEY) || 'grid'; } catch { return 'grid'; }
+  });
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState({ key: 'name', dir: 'asc' });
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
+
   const load = useCallback(async () => {
     try { const d = await getWarehouses(); setWarehouses(d); }
     catch (e) { setError(e.message); }
@@ -56,6 +87,11 @@ export default function WarehousesView() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const setView = (mode) => {
+    setViewMode(mode);
+    try { localStorage.setItem(VIEW_KEY, mode); } catch { /* ignore */ }
+  };
 
   const openAdd = () => { setEditing(null); setForm(INITIAL); setError(''); setModalOpen(true); };
   const openEdit = (w) => {
@@ -91,6 +127,40 @@ export default function WarehousesView() {
 
   const getInitials = (name) => name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 3);
 
+  const toggleSort = (key) => {
+    setSort(s => s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' });
+  };
+
+  const toggleExpanded = (id) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return warehouses;
+    return warehouses.filter(w =>
+      (w.name || '').toLowerCase().includes(q) ||
+      (w.address || '').toLowerCase().includes(q) ||
+      (w.contactPhone || '').toLowerCase().includes(q)
+    );
+  }, [warehouses, query]);
+
+  const sorted = useMemo(() => {
+    const list = [...filtered];
+    list.sort((a, b) => {
+      const av = sortValue(a, sort.key), bv = sortValue(b, sort.key);
+      const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+      return sort.dir === 'asc' ? cmp : -cmp;
+    });
+    return list;
+  }, [filtered, sort]);
+
+  const sortIcon = (key) => sort.key !== key ? faSort : sort.dir === 'asc' ? faSortUp : faSortDown;
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -103,15 +173,59 @@ export default function WarehousesView() {
         </button>
       </div>
 
+      <div className={tableStyles.toolbar}>
+        <div className={tableStyles.searchBox}>
+          <FontAwesomeIcon icon={faMagnifyingGlass} className={tableStyles.searchIcon} />
+          <input
+            className={tableStyles.searchInput}
+            placeholder="Search by name, address, or phone…"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            id="warehouse-search"
+          />
+          {query && (
+            <button className={tableStyles.searchClear} onClick={() => setQuery('')} title="Clear search">
+              <FontAwesomeIcon icon={faXmark} />
+            </button>
+          )}
+        </div>
+
+        <div className={tableStyles.viewToggle} role="group" aria-label="View mode">
+          <button
+            type="button"
+            className={`${tableStyles.toggleBtn} ${viewMode === 'grid' ? tableStyles.toggleBtnActive : ''}`}
+            onClick={() => setView('grid')}
+            title="Card view"
+            aria-pressed={viewMode === 'grid'}
+          >
+            <FontAwesomeIcon icon={faThLarge} />
+            <span className={tableStyles.toggleLabel}>Cards</span>
+          </button>
+          <button
+            type="button"
+            className={`${tableStyles.toggleBtn} ${viewMode === 'table' ? tableStyles.toggleBtnActive : ''}`}
+            onClick={() => setView('table')}
+            title="Table view"
+            aria-pressed={viewMode === 'table'}
+          >
+            <FontAwesomeIcon icon={faTable} />
+            <span className={tableStyles.toggleLabel}>Table</span>
+          </button>
+        </div>
+      </div>
+
       {error && <div className={styles.errorBanner}>{error}</div>}
 
       {loading ? (
         <div className={styles.loading}>Loading warehouses…</div>
-      ) : (
+      ) : sorted.length === 0 ? (
+        <div className={styles.empty}>
+          {query ? `No warehouses match "${query}".` : 'No warehouses yet. Add one!'}
+        </div>
+      ) : viewMode === 'grid' ? (
         <div className={styles.grid}>
-          {warehouses.length === 0 && <div className={styles.empty}>No warehouses yet. Add one!</div>}
-          {warehouses.map(w => (
-                <div key={w.id} className={styles.card}>
+          {sorted.map(w => (
+            <div key={w.id} className={styles.card}>
               <div className={styles.cardTop}>
                 <div className={styles.whIcon}>{getInitials(w.name)}</div>
                 <div className={styles.whInfo}>
@@ -138,6 +252,76 @@ export default function WarehousesView() {
               </div>
             </div>
           ))}
+        </div>
+      ) : (
+        <div className={tableStyles.tableWrap}>
+          <div className={tableStyles.tableScroll}>
+          <table className={tableStyles.table}>
+            <thead>
+              <tr>
+                <th className={tableStyles.thExpand} aria-hidden="true" />
+                {COLUMNS.map(col => (
+                  <th key={col.key} className={tableStyles.thSortable} onClick={() => toggleSort(col.key)}>
+                    <span>{col.label}</span>
+                    <FontAwesomeIcon icon={sortIcon(col.key)} className={tableStyles.sortIcon} />
+                  </th>
+                ))}
+                <th>Phone</th>
+                <th className={tableStyles.thActions}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map(w => {
+                const isOpen = expandedIds.has(w.id);
+                return (
+                  <React.Fragment key={w.id}>
+                    <tr
+                      className={`${tableStyles.tr} ${w.is24Hours ? tableStyles.tr24 : ''} ${isOpen ? tableStyles.trOpen : ''}`}
+                      onClick={() => toggleExpanded(w.id)}
+                    >
+                      <td className={tableStyles.tdExpand}>
+                        <FontAwesomeIcon icon={faChevronDown} className={tableStyles.expandChevron} />
+                      </td>
+                      <td>
+                        <div className={tableStyles.tName}>
+                          <div className={tableStyles.tIcon}>{getInitials(w.name)}</div>
+                          <span>{w.name}</span>
+                          {w.is24Hours && <span className={styles.badge24}>24/7</span>}
+                        </div>
+                      </td>
+                      <td className={tableStyles.tMuted}>{w.address || '—'}</td>
+                      <td className={tableStyles.tMono}>{formatHours(w)}</td>
+                      <td className={tableStyles.tMono}>{w.contactPhone || '—'}</td>
+                      <td className={tableStyles.tdActions} onClick={e => e.stopPropagation()}>
+                        <div className={tableStyles.actionsRow}>
+                          <button className={styles.editBtn} onClick={() => openEdit(w)} title="Edit"><FontAwesomeIcon icon={faPencil} /></button>
+                          <button className={styles.deleteBtn} onClick={() => setDeleteId(w.id)} title="Delete"><FontAwesomeIcon icon={faTrash} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr className={tableStyles.trExpandRow}>
+                      <td colSpan={6} className={tableStyles.tdExpandContent}>
+                        <div className={`${tableStyles.expandPanel} ${isOpen ? tableStyles.expandPanelOpen : ''}`}>
+                          <div className={tableStyles.expandPanelInner}>
+                            {w.address && (
+                              <div className={tableStyles.expandItem}>
+                                <FontAwesomeIcon icon={faLocationDot} />
+                                <span>{w.address}</span>
+                              </div>
+                            )}
+                            {w.notes
+                              ? <p className={styles.notes}>{w.notes}</p>
+                              : <p className={tableStyles.notesEmpty}>No notes on file.</p>}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+          </div>
         </div>
       )}
 
@@ -230,3 +414,4 @@ export default function WarehousesView() {
     </div>
   );
 }
+

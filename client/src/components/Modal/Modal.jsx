@@ -1,3 +1,4 @@
+//src/components/Modal/Modal.jsx
 import React, { useEffect, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faXmark } from '@fortawesome/free-solid-svg-icons';

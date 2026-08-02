@@ -20,6 +20,9 @@ import {
   faMoneyBillWave,
   faPallet,
   faCircleCheck,
+  faTable,
+  faThLarge,
+  faChevronDown,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   getShipments,
@@ -32,6 +35,7 @@ import {
 import Modal from "../../components/Modal/Modal.jsx";
 import StatusBadge from "../../components/StatusBadge/StatusBadge.jsx";
 import styles from "./ImportsView.module.css";
+import tableStyles from "./ImportsView.table.module.css";
 
 const AIRLINE_PALETTE = [
   "#00d4ff",
@@ -132,6 +136,23 @@ export default function ImportsView() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [selectedAirline, setSelectedAirline] = useState(null);
+
+  const VIEW_KEY = "importsViewMode";
+  const [viewMode, setViewMode] = useState(() => {
+    try { return localStorage.getItem(VIEW_KEY) || "cards"; } catch { return "cards"; }
+  });
+  const switchView = (mode) => {
+    setViewMode(mode);
+    try { localStorage.setItem(VIEW_KEY, mode); } catch {}
+  };
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
+  const toggleExpanded = (id) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   const load = useCallback(async () => {
     try {
@@ -321,9 +342,23 @@ export default function ImportsView() {
             {shipments.length} permit{shipments.length !== 1 ? "s" : ""} on file
           </p>
         </div>
-        <button className={styles.addBtn} onClick={openAdd} id="add-import-btn">
-          <FontAwesomeIcon icon={faPlus} /> New Permit
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div className={tableStyles.viewToggle} role="group" aria-label="View mode">
+            <button type="button"
+              className={`${tableStyles.toggleBtn} ${viewMode === "cards" ? tableStyles.toggleBtnActive : ""}`}
+              onClick={() => switchView("cards")} title="Card view" aria-pressed={viewMode === "cards"}>
+              <FontAwesomeIcon icon={faThLarge} /><span className={tableStyles.toggleLabel}>Cards</span>
+            </button>
+            <button type="button"
+              className={`${tableStyles.toggleBtn} ${viewMode === "table" ? tableStyles.toggleBtnActive : ""}`}
+              onClick={() => switchView("table")} title="Table view" aria-pressed={viewMode === "table"}>
+              <FontAwesomeIcon icon={faTable} /><span className={tableStyles.toggleLabel}>Table</span>
+            </button>
+          </div>
+          <button className={styles.addBtn} onClick={openAdd} id="add-import-btn">
+            <FontAwesomeIcon icon={faPlus} /> New Permit
+          </button>
+        </div>
       </div>
 
       <div className={styles.statBar}>
@@ -443,6 +478,147 @@ export default function ImportsView() {
 
       {loading ? (
         <div className={styles.loading}>Loading permits…</div>
+      ) : viewMode === "table" ? (
+        <div className={tableStyles.tableWrap}>
+          <div className={tableStyles.tableScroll}>
+            <table className={tableStyles.table}>
+              <thead>
+                <tr>
+                  <th className={tableStyles.thExpand} aria-hidden="true" />
+                  <th>AWB / ORD</th>
+                  <th>Airline</th>
+                  <th>Warehouse</th>
+                  <th>Cargo</th>
+                  <th>Status</th>
+                  <th>Last Free Day</th>
+                  <th>Flags</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.length === 0 ? (
+                  <tr className={tableStyles.emptyRow}><td colSpan={9}>No import permits match your filters.</td></tr>
+                ) : filtered.map((s) => {
+                  const daysOver = storageDaysOver(s.lastFreeDay);
+                  const isOverdue = daysOver > 0;
+                  const remaining = daysUntil(s.lastFreeDay);
+                  const color = airlineColor(s.airline?.id);
+                  const awbDisplay = s.airline?.awbPrefix && s.airwaybillNumber
+                    ? `${s.airline.awbPrefix}-${s.airwaybillNumber}` : s.airwaybillNumber;
+                  const isOpen = expandedIds.has(s.id);
+                  return (
+                    <React.Fragment key={s.id}>
+                      <tr
+                        className={`${tableStyles.tr} ${isOverdue ? tableStyles.rowOverdue : ""} ${isOpen ? tableStyles.trOpen : ""}`}
+                        onClick={() => toggleExpanded(s.id)}
+                      >
+                        <td className={tableStyles.tdExpand}>
+                          <FontAwesomeIcon icon={faChevronDown} className={tableStyles.expandChevron} />
+                        </td>
+                        <td>
+                          <div className={tableStyles.awb}>{awbDisplay || "—"}</div>
+                          <div className={tableStyles.subId}>ORD {s.ordNumber || "—"}</div>
+                        </td>
+                        <td>
+                          <div className={tableStyles.airlineCell}>
+                            <span className={tableStyles.airlinePip} style={{ backgroundColor: color }} />
+                            {s.airline?.name || "—"} ({s.airline?.code || "—"})
+                          </div>
+                        </td>
+                        <td className={tableStyles.muted}>{s.warehouse?.name || "—"}</td>
+                        <td className={tableStyles.cargo}>
+                          <strong>{s.pieces}</strong> pcs · {s.weight} {s.weightUnit}
+                          {s.pmcCount > 0 && <span className={tableStyles.muted}> · {s.pmcCount} PMC</span>}
+                        </td>
+                        <td onClick={(e) => e.stopPropagation()}><StatusBadge status={s.status} /></td>
+                        <td>
+                          {s.lastFreeDay ? (
+                            isOverdue ? (
+                              <span className={tableStyles.danger}>+{daysOver}d over</span>
+                            ) : remaining !== null && remaining <= 1 ? (
+                              <span className={tableStyles.warn}>{remaining === 0 ? "Due today" : `${remaining}d left`}</span>
+                            ) : (
+                              <span className={tableStyles.muted}>{formatDate(s.lastFreeDay)}</span>
+                            )
+                          ) : "—"}
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                            {s.isGDP && <span className={`${tableStyles.badge} ${tableStyles.badgeGdp}`}>GDP</span>}
+                            {isOverdue && !s.storageFeePaid && <span className={`${tableStyles.badge} ${tableStyles.badgeFee}`}>Storage</span>}
+                            {s.storageFeePaid && <span className={`${tableStyles.badge} ${tableStyles.badgeOk}`}>Paid</span>}
+                          </div>
+                        </td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <div className={tableStyles.actions}>
+                            <button className={`${tableStyles.actionBtn} ${tableStyles.editBtn}`} onClick={() => openEdit(s)} title="Edit">
+                              <FontAwesomeIcon icon={faPencil} />
+                            </button>
+                            <button className={`${tableStyles.actionBtn} ${tableStyles.deleteBtn}`} onClick={() => setDeleteId(s.id)} title="Delete">
+                              <FontAwesomeIcon icon={faTrash} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr className={tableStyles.trExpandRow}>
+                        <td colSpan={9} className={tableStyles.tdExpandContent}>
+                          <div className={`${tableStyles.expandPanel} ${isOpen ? tableStyles.expandPanelOpen : ""}`}>
+                            <div className={tableStyles.expandPanelInner}>
+                              <div className={tableStyles.expandGrid}>
+                                {s.lastFreeDay && (
+                                  <div className={tableStyles.expandItem}>
+                                    <span className={tableStyles.expandLabel}>Last Free Day</span>
+                                    <span className={tableStyles.expandValue}>{formatDate(s.lastFreeDay)}</span>
+                                  </div>
+                                )}
+                                {(s.storageFeePerDay > 0 || s.terminalFee > 0) && (
+                                  <div className={tableStyles.expandItem}>
+                                    <span className={tableStyles.expandLabel}>Fees</span>
+                                    <span className={tableStyles.expandValue}>
+                                      {s.terminalFee > 0 && <>Terminal ${s.terminalFee}{s.terminalFeePaid ? " ✓" : " ⚠"} </>}
+                                      {s.storageFeePerDay > 0 && <>Storage ${s.storageFeePerDay}/day{s.storageFeePaid ? " ✓" : " ⚠"}</>}
+                                    </span>
+                                  </div>
+                                )}
+                                {s.isGDP && (
+                                  <div className={tableStyles.expandItem}>
+                                    <span className={tableStyles.expandLabel}>GDP</span>
+                                    <span className={tableStyles.expandValue}>{s.gdpTemperatureRange || "Temperature controlled"}</span>
+                                  </div>
+                                )}
+                                {s.pickupReadyAt && (
+                                  <div className={tableStyles.expandItem}>
+                                    <span className={tableStyles.expandLabel}>Cargo Available</span>
+                                    <span className={tableStyles.expandValue}>{formatDateTime(s.pickupReadyAt)}</span>
+                                  </div>
+                                )}
+                                {s.deliveryAppointmentAt && (
+                                  <div className={tableStyles.expandItem}>
+                                    <span className={tableStyles.expandLabel}>Warehouse Appt</span>
+                                    <span className={tableStyles.expandValue}>{formatDateTime(s.deliveryAppointmentAt)}</span>
+                                  </div>
+                                )}
+                                {s.pmcCount > 0 && (
+                                  <div className={tableStyles.expandItem}>
+                                    <span className={tableStyles.expandLabel}>PMCs</span>
+                                    <span className={tableStyles.expandValue}>{s.pmcCount}</span>
+                                  </div>
+                                )}
+                              </div>
+                              {s.notes
+                                ? <p className={tableStyles.expandNotes}>{s.notes}</p>
+                                : <p className={tableStyles.expandNotes}>No notes on file.</p>}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : filtered.length === 0 ? (
         <div className={styles.empty}>
           No import permits match your filters.
@@ -1025,3 +1201,5 @@ export default function ImportsView() {
     </div>
   );
 }
+
+

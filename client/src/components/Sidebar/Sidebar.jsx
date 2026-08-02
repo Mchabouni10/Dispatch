@@ -13,6 +13,8 @@ import {
   faBolt,
   faCalendarDays,
   faKey,
+  faMoon,
+  faSun,
 } from "@fortawesome/free-solid-svg-icons";
 import styles from "./Sidebar.module.css";
 import logo from "../../../images/app-logo.jpeg";
@@ -31,7 +33,7 @@ const navItems = [
   { to: "/analytics", label: "Analytics", icon: faChartPie },
 ];
 
-export default function Sidebar({ user, onLogout }) {
+export default function Sidebar({ user, theme, onToggleTheme, onLogout }) {
   return (
     <aside className={styles.sidebar}>
       <div className={styles.brand}>
@@ -66,6 +68,18 @@ export default function Sidebar({ user, onLogout }) {
           </NavLink>
         ))}
       </nav>
+
+      <button
+        type="button"
+        className={styles.themeToggle}
+        onClick={onToggleTheme}
+        aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+      >
+        <span className={styles.themeIcon}>
+          <FontAwesomeIcon icon={theme === "light" ? faMoon : faSun} />
+        </span>
+        <span>{theme === "light" ? "Dark mode" : "Light mode"}</span>
+      </button>
 
       <div className={styles.footer}>
         <div className={styles.account}>

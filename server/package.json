@@ -4,17 +4,14 @@
   "description": "Express and PostgreSQL backend for Dispatch Management",
   "main": "server.js",
   "scripts": {
-    "start": "npm run prisma:generate && node server.js",
-    "dev": "npm run prisma:generate && nodemon server.js",
+    "start": "prisma generate && node server.js",
+    "dev": "prisma generate && nodemon server.js",
     "seed": "node prisma/seed.js",
-    "prisma:build": "node prisma/scripts/combine.js",
-    "prisma:generate": "node prisma/scripts/combine.js && prisma generate --schema prisma/generated/schema.prisma",
-    "prisma:validate": "node prisma/scripts/combine.js && npx prisma validate --schema prisma/generated/schema.prisma",
-    "prisma:seed": "prisma db seed"
+    "prisma:generate": "prisma generate"
   },
   "prisma": {
     "seed": "node prisma/seed.js",
-    "schema": "prisma/generated/schema.prisma"
+    "schema": "prisma/schema.prisma"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

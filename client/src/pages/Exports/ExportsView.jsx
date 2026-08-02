@@ -6,12 +6,14 @@ import {
   faMagnifyingGlass, faBoxesStacked, faWeightHanging,
   faWarehouse, faClock, faCalendarCheck, faTruck,
   faFileLines, faCircleCheck,
-  faPallet, faTriangleExclamation, faBarcode
+  faPallet, faTriangleExclamation, faBarcode,
+  faTable, faThLarge, faChevronDown
 } from '@fortawesome/free-solid-svg-icons';
 import { getShipments, createShipment, updateShipment, deleteShipment, getAirlines, getWarehouses } from '../../api/api.js';
 import Modal from '../../components/Modal/Modal.jsx';
 import StatusBadge from '../../components/StatusBadge/StatusBadge.jsx';
 import styles from '../Imports/ImportsView.module.css';
+import tableStyles from './ExportsView.table.module.css';
 
 function formatDateTime(d) {
   if (!d) return '—';
@@ -59,6 +61,23 @@ export default function ExportsView() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [selectedAirline, setSelectedAirline] = useState(null);
+
+  const VIEW_KEY = 'exportsViewMode';
+  const [viewMode, setViewMode] = useState(() => {
+    try { return localStorage.getItem(VIEW_KEY) || 'cards'; } catch { return 'cards'; }
+  });
+  const switchView = (mode) => {
+    setViewMode(mode);
+    try { localStorage.setItem(VIEW_KEY, mode); } catch {}
+  };
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
+  const toggleExpanded = (id) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   const load = useCallback(async () => {
     try {
@@ -202,9 +221,23 @@ export default function ExportsView() {
           </h1>
           <p className={styles.pageSub}>{shipments.length} export{shipments.length !== 1 ? 's' : ''} ready for dispatch</p>
         </div>
-        <button className={styles.addBtn} onClick={openAdd} id="add-export-btn">
-          <FontAwesomeIcon icon={faPlus} /> New Export
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className={tableStyles.viewToggle} role="group" aria-label="View mode">
+            <button type="button"
+              className={`${tableStyles.toggleBtn} ${viewMode === 'cards' ? tableStyles.toggleBtnActive : ''}`}
+              onClick={() => switchView('cards')} title="Card view" aria-pressed={viewMode === 'cards'}>
+              <FontAwesomeIcon icon={faThLarge} /><span className={tableStyles.toggleLabel}>Cards</span>
+            </button>
+            <button type="button"
+              className={`${tableStyles.toggleBtn} ${viewMode === 'table' ? tableStyles.toggleBtnActive : ''}`}
+              onClick={() => switchView('table')} title="Table view" aria-pressed={viewMode === 'table'}>
+              <FontAwesomeIcon icon={faTable} /><span className={tableStyles.toggleLabel}>Table</span>
+            </button>
+          </div>
+          <button className={styles.addBtn} onClick={openAdd} id="add-export-btn">
+            <FontAwesomeIcon icon={faPlus} /> New Export
+          </button>
+        </div>
       </div>
 
       <div className={styles.statBar}>
@@ -246,6 +279,120 @@ export default function ExportsView() {
 
       {loading ? (
         <div className={styles.loading}>Loading exports…</div>
+      ) : viewMode === 'table' ? (
+        <div className={tableStyles.tableWrap}>
+          <div className={tableStyles.tableScroll}>
+            <table className={tableStyles.table}>
+              <thead>
+                <tr>
+                  <th className={tableStyles.thExpand} aria-hidden="true" />
+                  <th>AWB</th>
+                  <th>Airline</th>
+                  <th>Origin</th>
+                  <th>Cargo</th>
+                  <th>Status</th>
+                  <th>Flight</th>
+                  <th>Cutoff</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.length === 0 ? (
+                  <tr className={tableStyles.emptyRow}><td colSpan={9}>No export shipments match your filters.</td></tr>
+                ) : filtered.map(s => {
+                  const lockoutStatus = getLockoutStatus(s.lockoutTime);
+                  const isExpired = lockoutStatus?.status === 'expired';
+                  const awbDisplay = s.airline?.awbPrefix && s.airwaybillNumber
+                    ? `${s.airline.awbPrefix}-${s.airwaybillNumber}` : s.airwaybillNumber;
+                  const isOpen = expandedIds.has(s.id);
+                  return (
+                    <React.Fragment key={s.id}>
+                      <tr
+                        className={`${tableStyles.tr} ${isExpired ? tableStyles.rowOverdue : ''} ${isOpen ? tableStyles.trOpen : ''}`}
+                        onClick={() => toggleExpanded(s.id)}
+                      >
+                        <td className={tableStyles.tdExpand}>
+                          <FontAwesomeIcon icon={faChevronDown} className={tableStyles.expandChevron} />
+                        </td>
+                        <td>
+                          <div className={tableStyles.awb}>{awbDisplay || '—'}</div>
+                        </td>
+                        <td className={tableStyles.muted}>
+                          {s.airline?.name || '—'} ({s.airline?.code || '—'})
+                        </td>
+                        <td className={tableStyles.muted}>{s.warehouse?.name || '—'}</td>
+                        <td className={tableStyles.cargo}>
+                          <strong>{s.pieces}</strong> pcs · {s.weight} {s.weightUnit}
+                          {s.pmcCount > 0 && <span className={tableStyles.muted}> · {s.pmcCount} PMC</span>}
+                        </td>
+                        <td onClick={e => e.stopPropagation()}><StatusBadge status={s.status} /></td>
+                        <td className={tableStyles.muted}>{formatDateTime(s.flightDate)}</td>
+                        <td>
+                          {lockoutStatus ? (
+                            <span className={
+                              lockoutStatus.color === 'danger' ? tableStyles.danger
+                              : lockoutStatus.color === 'warning' ? tableStyles.warn
+                              : tableStyles.success
+                            }>
+                              {lockoutStatus.label}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td onClick={e => e.stopPropagation()}>
+                          <div className={tableStyles.actions}>
+                            <button className={`${tableStyles.actionBtn} ${tableStyles.editBtn}`} onClick={() => openEdit(s)} title="Edit">
+                              <FontAwesomeIcon icon={faPencil} />
+                            </button>
+                            <button className={`${tableStyles.actionBtn} ${tableStyles.deleteBtn}`} onClick={() => setDeleteId(s.id)} title="Delete">
+                              <FontAwesomeIcon icon={faTrash} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr className={tableStyles.trExpandRow}>
+                        <td colSpan={9} className={tableStyles.tdExpandContent}>
+                          <div className={`${tableStyles.expandPanel} ${isOpen ? tableStyles.expandPanelOpen : ''}`}>
+                            <div className={tableStyles.expandPanelInner}>
+                              <div className={tableStyles.expandGrid}>
+                                {s.pickupReadyAt && (
+                                  <div className={tableStyles.expandItem}>
+                                    <span className={tableStyles.expandLabel}>Cargo Ready</span>
+                                    <span className={tableStyles.expandValue}>{formatDateTime(s.pickupReadyAt)}</span>
+                                  </div>
+                                )}
+                                {s.deliveryAppointmentAt && (
+                                  <div className={tableStyles.expandItem}>
+                                    <span className={tableStyles.expandLabel}>Airport Appt</span>
+                                    <span className={tableStyles.expandValue}>{formatDateTime(s.deliveryAppointmentAt)}</span>
+                                  </div>
+                                )}
+                                {s.pmcCount > 0 && (
+                                  <div className={tableStyles.expandItem}>
+                                    <span className={tableStyles.expandLabel}>PMCs</span>
+                                    <span className={tableStyles.expandValue}>{s.pmcCount}</span>
+                                  </div>
+                                )}
+                                {s.lockoutTime && (
+                                  <div className={tableStyles.expandItem}>
+                                    <span className={tableStyles.expandLabel}>Lockout Time</span>
+                                    <span className={tableStyles.expandValue}>{formatDateTime(s.lockoutTime)}</span>
+                                  </div>
+                                )}
+                              </div>
+                              {s.notes
+                                ? <p className={tableStyles.expandNotes}>{s.notes}</p>
+                                : <p className={tableStyles.expandNotes}>No notes on file.</p>}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : filtered.length === 0 ? (
         <div className={styles.empty}>No export shipments match your filters.</div>
       ) : (

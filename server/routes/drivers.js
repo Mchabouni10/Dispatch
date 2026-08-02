@@ -192,6 +192,107 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// GET driver's complete equipment history
+// Supports optional date-range filtering for safety/compliance lookups:
+//   ?days=30                       → handoffs checked out in the last 30 days
+//   ?startDate=...&endDate=...     → explicit range (either can be used alone)
+// Without any of these, the full history is returned (previous behavior).
+router.get('/:id/history', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { limit = 100, includeActive = true, days, startDate, endDate } = req.query;
+
+    const driver = await prisma.driver.findUnique({
+      where: { id },
+    });
+
+    if (!driver) {
+      return res.status(404).json({ message: 'Driver not found' });
+    }
+
+    // Build the checkOutTime range filter, if any range params were sent.
+    let checkOutTime;
+    if (days) {
+      const since = new Date(Date.now() - parseInt(days) * 24 * 60 * 60 * 1000);
+      checkOutTime = { gte: since };
+    } else if (startDate || endDate) {
+      checkOutTime = {
+        ...(startDate ? { gte: new Date(startDate) } : {}),
+        ...(endDate ? { lte: new Date(endDate) } : {}),
+      };
+    }
+
+    const baseWhere = {
+      driverId: id,
+      ...(checkOutTime ? { checkOutTime } : {}),
+    };
+
+    const handoffs = await prisma.equipmentHandoff.findMany({
+      where: {
+        ...baseWhere,
+        ...(includeActive === 'false' ? { isActive: false } : {}),
+      },
+      orderBy: { checkOutTime: 'desc' },
+      take: parseInt(limit),
+      include: {
+        equipment: true,
+        replacedEquipment: true,
+        trailer: true,
+        dispatcher: {
+          select: { name: true, employeeId: true },
+        },
+      },
+    });
+
+    // Summary stats scoped to the same range so the numbers shown next to
+    // the list always match what's actually in the list.
+    const totalHandoffs = await prisma.equipmentHandoff.count({
+      where: baseWhere,
+    });
+
+    const activeHandoffs = await prisma.equipmentHandoff.count({
+      where: { ...baseWhere, isActive: true },
+    });
+
+    const uniqueEquipment = await prisma.equipmentHandoff.groupBy({
+      by: ['equipmentId'],
+      where: baseWhere,
+      _count: true,
+    });
+
+    const uniqueTrailers = await prisma.equipmentHandoff.groupBy({
+      by: ['trailerId'],
+      where: {
+        ...baseWhere,
+        trailerId: { not: null },
+      },
+      _count: true,
+    });
+
+    res.json({
+      driver: { 
+        id: driver.id, 
+        name: driver.name, 
+        employeeId: driver.employeeId,
+        photo: driver.photo,
+      },
+      range: checkOutTime
+        ? { days: days ? parseInt(days) : null, startDate: startDate || null, endDate: endDate || null }
+        : null,
+      summary: {
+        totalHandoffs,
+        activeHandoffs,
+        uniqueEquipmentDriven: uniqueEquipment.length,
+        uniqueTrailersUsed: uniqueTrailers.length,
+      },
+      history: handoffs,
+    });
+  } catch (err) {
+    console.error('[GET /api/drivers/:id/history] Error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // POST create driver
 router.post('/', async (req, res) => {
   try {

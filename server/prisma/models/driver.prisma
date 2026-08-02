@@ -14,16 +14,13 @@ model Driver {
   // ─── AVAILABILITY ───
   status                String   @default("Available")
   statusReason          String?
-  // Leave window (only meaningful when status is Vacation / Sick Leave / Absent / Training)
   leaveStart            DateTime?
   leaveEnd              DateTime?
   
   // ─── SCHEDULE ───
-  // schedule is an auto-generated human-readable summary (e.g. "Mon-Fri (06:00-14:00)")
-  // derived from shiftStart/shiftEnd + daysOff, kept for display/search convenience.
   schedule              String   @db.VarChar(100)
-  shiftStart            String?  @db.VarChar(5) // "HH:00", whole-hour shift start
-  shiftEnd              String?  @db.VarChar(5) // "HH:00", whole-hour shift end
+  shiftStart            String?  @db.VarChar(5)
+  shiftEnd              String?  @db.VarChar(5)
   daysOff               String[]
   availableOnDaysOff    Boolean  @default(false)
   overtimePreference    Boolean  @default(false)
@@ -33,13 +30,13 @@ model Driver {
   licenseNumber         String?
   licenseClass          String   @default("A") @db.VarChar(1)
   licenseExpiration     DateTime?
-  licensePhoto          String?  @db.VarChar(255) // Scanned copy of the driver's license
+  licensePhoto          String?  @db.VarChar(255)
   medicalCertExpiration DateTime?
   endorsements          String[]
   vehicleTypes          String[]
   trailerEligible       Boolean  @default(true)
   hazmatCertified       Boolean  @default(false)
-  gdpTrained            Boolean  @default(false) // Good Distribution Practice: reefer handling, pickups, checklist compliance
+  gdpTrained            Boolean  @default(false)
   
   // ─── TRACKING ───
   currentLocation       String?  
@@ -49,7 +46,7 @@ model Driver {
   hoursDrivenToday      Float    @default(0)
   onDutyHours           Float    @default(0)
   lastBreakTime         DateTime?
-  breakUntil            DateTime? // set on "Break" from the Handoff Board; cleared on check-in/status change
+  breakUntil            DateTime?
   shiftStartTime        DateTime?
   shiftEndTime          DateTime?
   
@@ -88,6 +85,9 @@ model Driver {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  trips Trip[]
-  assignedEquipment Equipment[] // truck(s)/trailer(s) currently handed off to this driver via the Handoff Board
+  // ─── RELATIONS ───
+  trips                 Trip[]
+  assignedEquipment     Equipment[]
+  equipmentHandoffs     EquipmentHandoff[]                    // primary driver on the handoff
+  handoffsAsApprover    EquipmentHandoff[] @relation("ApproverDriver")  // when this driver is the dispatcher/approver
 }

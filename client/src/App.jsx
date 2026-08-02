@@ -16,9 +16,27 @@ import styles from "./App.module.css";
 import AuthView from "./pages/Auth/AuthView.jsx";
 import { clearAuthToken, getAuthToken, getCurrentUser } from "./api/api.js";
 
+const getInitialTheme = () => {
+  if (typeof window === "undefined") return "dark";
+
+  const storedTheme = window.localStorage.getItem("dispatch-theme");
+  if (storedTheme === "light" || storedTheme === "dark") {
+    return storedTheme;
+  }
+
+  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+};
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [theme, setTheme] = useState(getInitialTheme);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    document.documentElement.style.colorScheme = theme;
+    window.localStorage.setItem("dispatch-theme", theme);
+  }, [theme]);
 
   useEffect(() => {
     const expire = () => setUser(null);
@@ -39,7 +57,12 @@ export default function App() {
 
   return (
     <div className={styles.app}>
-      <Sidebar user={user} onLogout={() => { clearAuthToken(); setUser(null); }} />
+      <Sidebar
+        user={user}
+        theme={theme}
+        onToggleTheme={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
+        onLogout={() => { clearAuthToken(); setUser(null); }}
+      />
       <main className={styles.main}>
         <Routes>
           <Route path="/" element={<DashboardView />} />
