@@ -1,6 +1,6 @@
 .page {
-  padding: 34px 38px 50px;
-  max-width: 1550px;
+  padding: 24px 28px 32px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 .header {
@@ -18,7 +18,7 @@
   letter-spacing: 1.2px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 24px;
   margin-bottom: 9px;
 }
 .header h1 {
@@ -36,14 +36,14 @@
   padding: 11px 16px;
   font-weight: 800;
   display: inline-flex;
-  gap: 8px;
+  gap: 24px;
   align-items: center;
   box-shadow: 0 5px 22px rgba(0, 212, 255, 0.18);
 }
 .overview {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  gap: 24px;
   margin-bottom: 24px;
 }
 .metric {
@@ -109,9 +109,9 @@
   font-weight: 700;
 }
 .tripList {
-  padding: 12px;
+  padding: 24px;
   display: grid;
-  gap: 12px;
+  gap: 24px;
 }
 .tripCard {
   border: 1px solid var(--border);
@@ -140,7 +140,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 24px;
   padding: 15px 16px;
 }
 .tripNumber {
@@ -149,7 +149,7 @@
   font-size: 13px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 24px;
 }
 .runTypeTag {
   padding: 2px 8px;
@@ -175,7 +175,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 24px;
   margin-bottom: 14px;
 }
 .endpoint {
@@ -506,7 +506,7 @@
 .runTypePicker {
   display: flex;
   gap: 10px;
-  margin-bottom: 18px;
+  margin-bottom: 24px;
 }
 .runTypeBtn {
   flex: 1;
@@ -514,7 +514,7 @@
   align-items: center;
   justify-content: center;
   gap: 9px;
-  padding: 12px;
+  padding: 24px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.02);
@@ -593,7 +593,7 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 24px;
   margin-top: 10px;
 }
 .laneCompact {
@@ -644,7 +644,7 @@
 .readyTop {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 24px;
   margin-bottom: 5px;
 }
 .readyTop strong {
@@ -684,13 +684,13 @@
   padding: 10px 13px;
   border-radius: 8px;
   font-size: 13px;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 .formIntro {
   color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.55;
-  margin-bottom: 18px;
+  margin-bottom: 24px;
 }
 .formGrid {
   display: grid;
@@ -726,7 +726,7 @@
   overflow: auto;
 }
 .pickerTitle {
-  padding: 12px 14px;
+  padding: 14px 18px;
   font-size: 12px;
   font-weight: 800;
   border-bottom: 1px solid var(--border);
@@ -741,7 +741,7 @@
   display: flex;
   text-align: left;
   gap: 11px;
-  padding: 12px 14px;
+  padding: 14px 18px;
   color: var(--text-primary);
   background: transparent;
   border-bottom: 1px solid var(--border);
@@ -832,7 +832,7 @@
 .tripActions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 24px;
 }
 
 .actionIconButton {
@@ -865,7 +865,7 @@
 .deleteConfirmContent {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 24px;
   color: var(--text-primary);
   font-size: 14px;
   line-height: 1.5;
@@ -875,7 +875,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 14px;
+  padding: 14px 18px;
   background: rgba(255, 82, 82, 0.1);
   border: 1px solid rgba(255, 82, 82, 0.3);
   border-radius: 8px;
@@ -935,12 +935,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 24px;
   padding: 14px 18px;
   background: linear-gradient(135deg, rgba(0, 212, 255, 0.08) 0%, rgba(16, 30, 50, 0.6) 100%);
   border: 1px solid rgba(0, 212, 255, 0.22);
   border-radius: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 24px;
 }
 
 .routeStep {
@@ -960,7 +960,7 @@
 .routeInfo {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 24px;
   color: var(--text-primary);
   font-size: 14px;
 }
@@ -993,14 +993,14 @@
 .airlineSuggestionBanner {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 24px;
   padding: 11px 15px;
   background: rgba(0, 208, 132, 0.1);
   border: 1px solid rgba(0, 208, 132, 0.3);
   border-radius: 10px;
   color: var(--success);
   font-size: 13px;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 
 .airlineSuggestionBanner svg {
@@ -1025,8 +1025,8 @@
 .tripRouteFlow {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: 24px;
+  padding: 20px 24px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--glass-border);
   border-radius: 8px;
@@ -1070,7 +1070,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 .routeSelectGrid label {
   color: var(--text-secondary);
@@ -1131,15 +1131,15 @@
 .handoffActionList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 24px;
   margin-bottom: 4px;
 }
 
 .handoffOption {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 12px 14px;
+  gap: 24px;
+  padding: 14px 18px;
   text-align: left;
   background: rgba(255, 255, 255, 0.02);
   border: 1.5px solid var(--border);
@@ -1229,6 +1229,117 @@
   background: rgba(0, 212, 255, 0.06);
   border-color: rgba(0, 212, 255, 0.28);
   color: var(--text-primary);
+}
+
+
+
+
+/* ── Backup driver modal: cargo mode toggles ─────────────────────── */
+.manifestRowHead {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.manifestRowType {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.modeToggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 9px;
+}
+.modeBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.modeBtn:hover {
+  border-color: var(--border-hover);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+.modeBtn svg {
+  font-size: 10px;
+}
+.modeBtnSelected {
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+  background: rgba(255, 255, 255, 0.08);
+}
+.modeBtnMove.modeBtnSelected {
+  border-color: var(--accent-cyan);
+  background: rgba(0, 212, 255, 0.12);
+  color: var(--accent-cyan);
+}
+.modeBtnSplit.modeBtnSelected {
+  border-color: var(--warning);
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+.splitRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 9px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.splitRow label {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+.splitRow input {
+  width: 70px;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  outline: none;
+}
+.splitRow .fieldHint {
+  margin-top: 0;
+}
+.manifestSummaryBar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  background: rgba(0, 212, 255, 0.06);
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-primary);
+}
+.manifestSummaryBar svg {
+  color: var(--accent-cyan);
+  font-size: 13px;
 }
 
 

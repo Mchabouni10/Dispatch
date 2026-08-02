@@ -1,6 +1,6 @@
 .page {
-  padding: 34px 38px 50px;
-  max-width: 1550px;
+  padding: 24px 28px 32px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 
@@ -9,7 +9,7 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 22px;
+  margin-bottom: 16px;
   flex-wrap: wrap;
 }
 
@@ -21,7 +21,7 @@
   letter-spacing: 1.2px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 24px;
   margin-bottom: 8px;
 }
 
@@ -41,7 +41,7 @@
 .headerRight {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 24px;
   flex-wrap: wrap;
 }
 
@@ -49,7 +49,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 14px;
+  padding: 12px 20px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -77,7 +77,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 12px;
+  padding: 20px 24px;
   border-radius: var(--radius-md);
   font-size: 12px;
   font-weight: 600;
@@ -106,7 +106,7 @@
 .refreshBtn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 24px;
   padding: 9px 16px;
   background: linear-gradient(135deg, rgba(0, 212, 255, 0.15), rgba(79, 142, 247, 0.12));
   border: 1px solid rgba(0, 212, 255, 0.35);
@@ -143,7 +143,7 @@
   padding: 10px 14px;
   border-radius: 8px;
   font-size: 13px;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 
 /* Pulse strip */
@@ -151,13 +151,13 @@
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 10px;
-  margin-bottom: 18px;
+  margin-bottom: 24px;
 }
 
 .pulseItem {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 24px;
   padding: 14px 16px;
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
@@ -228,7 +228,7 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 14px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .statCard {
@@ -325,7 +325,7 @@
 .mainGrid {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.9fr);
-  gap: 16px;
+  gap: 24px;
   align-items: start;
 }
 
@@ -341,7 +341,7 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 12px;
+  gap: 24px;
   padding: 16px 18px 12px;
   border-bottom: 1px solid var(--border);
 }
@@ -351,7 +351,7 @@
   font-weight: 800;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 24px;
 }
 
 .panelHead h2 svg {
@@ -475,7 +475,7 @@
 .alertTop {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 24px;
   margin-bottom: 3px;
 }
 
@@ -549,7 +549,7 @@
 }
 
 .moreAlerts {
-  padding: 12px 16px;
+  padding: 20px 24px;
   font-size: 12px;
   color: var(--text-secondary);
   border-top: 1px solid var(--border);
@@ -564,12 +564,12 @@
 .tripStack {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px;
+  gap: 24px;
+  padding: 24px;
 }
 
 .tripCard {
-  padding: 12px 14px;
+  padding: 14px 18px;
   border-radius: 10px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.02);
@@ -579,7 +579,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: 24px;
   margin-bottom: 6px;
 }
 
@@ -611,13 +611,13 @@
 .shortcuts {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 8px;
+  gap: 24px;
 }
 
 .shortcut {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 24px;
   padding: 14px 16px;
   border-radius: var(--radius-md);
   border: 1px solid var(--glass-border);

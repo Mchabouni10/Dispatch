@@ -1,6 +1,6 @@
 .page {
-  padding: 34px 38px 50px;
-  max-width: 1550px;
+  padding: 24px 28px 32px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 .header {
@@ -18,7 +18,7 @@
   letter-spacing: 1.2px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 24px;
   margin-bottom: 9px;
 }
 .header h1 {
@@ -41,13 +41,13 @@
 .brief {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 24px;
+  margin-bottom: 24px;
 }
 .briefCard {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 24px;
   padding: 14px 16px;
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
@@ -79,8 +79,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 18px;
+  gap: 24px;
+  margin-bottom: 24px;
 }
 .filterIcon {
   color: var(--text-muted);
@@ -118,7 +118,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 18px;
+  padding: 20px 24px;
   border-bottom: 1px solid var(--border);
 }
 .monthHeader h2 {
@@ -262,15 +262,15 @@
 .emptySide {
   color: var(--text-secondary);
   font-size: 12px;
-  padding: 16px 18px;
+  padding: 20px 24px;
 }
 .eventList,
 .agendaList {
   list-style: none;
-  padding: 8px 10px;
+  padding: 10px 14px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 24px;
 }
 .eventItem {
   display: flex;
@@ -328,7 +328,7 @@
 }
 .agendaBody {
   display: flex;
-  gap: 8px;
+  gap: 24px;
   align-items: flex-start;
   font-size: 12px;
 }
@@ -371,7 +371,7 @@
   padding: 10px 13px;
   border-radius: 8px;
   font-size: 13px;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 .loading {
   padding: 40px;
@@ -427,7 +427,7 @@
 .rosterTitle {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 24px;
   font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
@@ -449,7 +449,7 @@
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  padding: 8px 10px;
+  padding: 10px 14px;
   border-radius: 10px;
   background: rgba(149, 165, 166, 0.08);
   border: 1px solid rgba(149, 165, 166, 0.15);

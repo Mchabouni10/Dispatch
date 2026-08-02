@@ -1,6 +1,6 @@
 .page {
-  padding: 34px 38px 50px;
-  max-width: 1550px;
+  padding: 24px 28px 32px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 .header {
@@ -19,7 +19,7 @@
   letter-spacing: 1.2px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 24px;
   margin-bottom: 9px;
 }
 .header h1 {
@@ -33,10 +33,10 @@
 .periodGroup {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 24px;
 }
 .periodBtn {
-  padding: 8px 12px;
+  padding: 20px 24px;
   border-radius: 100px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.03);
@@ -53,14 +53,14 @@
 .kpiRow {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 24px;
+  margin-bottom: 24px;
 }
 .kpi {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px;
+  gap: 24px;
+  padding: 24px;
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
@@ -90,15 +90,15 @@
 .grid2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 24px;
+  margin-bottom: 24px;
 }
 .panel {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   padding: 18px 20px 20px;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 .panelAlert {
   border-color: rgba(255, 179, 71, 0.3);
@@ -114,8 +114,8 @@
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 24px;
+  margin-bottom: 24px;
 }
 .panelHead h2 {
   font-size: 15px;
@@ -134,7 +134,7 @@
 .splitLabel {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 24px;
   font-size: 12px;
   color: var(--text-secondary);
   margin-bottom: 6px;
@@ -188,7 +188,7 @@
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 24px;
 }
 .rankTop {
   display: flex;
@@ -237,7 +237,7 @@
 .feeGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  gap: 24px;
 }
 .feeGrid span {
   display: block;
@@ -319,7 +319,7 @@
   padding: 10px 13px;
   border-radius: 8px;
   font-size: 13px;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 .loading {
   padding: 40px;
@@ -424,7 +424,7 @@
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 12px 14px;
+  padding: 14px 18px;
 }
 .detailCargo {
   grid-column: 1 / -1;
@@ -435,7 +435,7 @@
   margin-bottom: 10px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 24px;
   color: var(--accent-cyan);
 }
 .detailBlock ul {
@@ -461,7 +461,7 @@
 }
 .cargoTable th {
   text-align: left;
-  padding: 8px 10px;
+  padding: 10px 14px;
   color: var(--text-muted);
   font-size: 10px;
   text-transform: uppercase;
@@ -469,7 +469,7 @@
   border-bottom: 1px solid var(--border);
 }
 .cargoTable td {
-  padding: 8px 10px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border);
   color: var(--text-secondary);
 }

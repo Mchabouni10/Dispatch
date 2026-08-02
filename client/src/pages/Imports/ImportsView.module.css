@@ -1,16 +1,16 @@
 /* frontend/src/views/Imports/ImportsView.module.css */
-.page { max-width: 1300px; }
-.header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
+.page { max-width: 1240px; padding: 20px 24px 28px; }
+.header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
 .pageTitle { display: flex; align-items: center; gap: 10px; font-size: 26px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.5px; }
 .titleIcon { color: var(--success); }
 .pageSub { color: var(--text-secondary); font-size: 13px; margin-top: 4px; }
-.addBtn { display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: linear-gradient(135deg, var(--success), #00a868); color: white; border: none; border-radius: var(--radius-md); font-size: 13.5px; font-weight: 600; transition: var(--transition); box-shadow: 0 4px 12px rgba(0,208,132,0.25); cursor: pointer; }
+.addBtn { display: flex; align-items: center; gap: 24px; padding: 12px 24px; background: linear-gradient(135deg, var(--success), #00a868); color: white; border: none; border-radius: var(--radius-md); font-size: 13.5px; font-weight: 600; transition: var(--transition); box-shadow: 0 4px 12px rgba(0,208,132,0.25); cursor: pointer; }
 .addBtn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,208,132,0.35); }
 
 /* ── Stat bar ── */
-.statBar { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.statBar { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 24px; margin-bottom: 24px; }
 .statCard {
-  display: flex; align-items: center; gap: 13px; padding: 16px 18px;
+  display: flex; align-items: center; gap: 13px; padding: 20px 24px;
   background: var(--glass-bg); border: 1px solid var(--glass-border);
   border-radius: var(--radius-md); border-left: 3px solid var(--accent);
   transition: var(--transition);
@@ -44,14 +44,14 @@
 .filterSelect option { background: #111c33; }
 
 .groupToggle {
-  display: flex; align-items: center; gap: 8px; padding: 10px 16px;
+  display: flex; align-items: center; gap: 24px; padding: 12px 20px;
   background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md);
   color: var(--text-secondary); font-size: 12.5px; font-weight: 600; margin-left: auto; transition: var(--transition); cursor: pointer;
 }
 .groupToggle:hover { border-color: var(--border-hover); color: var(--text-primary); }
 .groupToggleActive { border-color: var(--accent-cyan); background: rgba(0,212,255,0.08); color: var(--accent-cyan); }
 
-.errorBanner { background: var(--danger-bg); border: 1px solid rgba(255,71,87,0.3); color: var(--danger); padding: 12px 16px; border-radius: var(--radius-md); font-size: 13px; margin-bottom: 16px; }
+.errorBanner { background: var(--danger-bg); border: 1px solid rgba(255,71,87,0.3); color: var(--danger); padding: 20px 24px; border-radius: var(--radius-md); font-size: 13px; margin-bottom: 24px; }
 .loading, .empty { text-align: center; padding: 60px; color: var(--text-secondary); font-size: 14px; }
 
 /* ── Airline grouping ── */
@@ -75,7 +75,7 @@
 .card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--border-hover); border-left-color: var(--airline-color, var(--border-hover)); }
 .overdueCard { border-color: rgba(255,71,87,0.4); border-left-color: var(--danger); box-shadow: 0 0 20px rgba(255,71,87,0.1); }
 
-.overdueAlert { background: var(--danger-bg); border-bottom: 1px solid rgba(255,71,87,0.2); color: var(--danger); padding: 8px 16px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.overdueAlert { background: var(--danger-bg); border-bottom: 1px solid rgba(255,71,87,0.2); color: var(--danger); padding: 8px 16px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 24px; }
 .paidBadge { background: var(--success); color: white; padding: 2px 8px; border-radius: 100px; font-size: 10px; margin-left: auto; }
 
 .cardHeader { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
@@ -103,7 +103,7 @@
 
 .airlinePip { width: 7px; height: 7px; border-radius: 50%; background: var(--airline-color, var(--accent)); flex: 0 0 auto; }
 
-.lfdRow { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm); font-size: 12px; color: var(--text-secondary); gap: 8px; }
+.lfdRow { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm); font-size: 12px; color: var(--text-secondary); gap: 24px; }
 .lfdRow strong { color: var(--text-primary); }
 .lfdRow svg { color: var(--text-muted); }
 .lfdOverdue { background: var(--danger-bg); color: var(--danger); }
@@ -115,7 +115,7 @@
 .feeBadge { background: rgba(255,71,87,0.2); color: var(--danger); padding: 2px 8px; border-radius: 100px; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .dueSoonBadge { background: var(--warning-bg); color: var(--warning); padding: 2px 8px; border-radius: 100px; font-size: 11px; font-weight: 700; white-space: nowrap; }
 
-.feeRow { display: flex; gap: 12px; flex-wrap: wrap; padding: 4px 0; }
+.feeRow { display: flex; gap: 24px; flex-wrap: wrap; padding: 4px 0; }
 .paidFee { color: var(--success); font-size: 12px; font-weight: 600; }
 .unpaidFee { color: var(--warning); font-size: 12px; font-weight: 600; }
 
@@ -127,7 +127,7 @@
 .form { display: flex; flex-direction: column; }
 .formSectionLabel { font-size: 11px; font-weight: 800; color: var(--accent-cyan); text-transform: uppercase; letter-spacing: 0.6px; margin: 4px 0 10px; }
 .formSectionLabel:first-of-type { margin-top: 0; }
-.formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
 .formGroup { display: flex; flex-direction: column; gap: 6px; }
 .formGroup.fullWidth { grid-column: 1 / -1; }
 
@@ -138,18 +138,18 @@
 select.input { appearance: auto; }
 select.input option { background: #111c33; }
 
-.weightInput { display: flex; gap: 8px; width: 100%; }
+.weightInput { display: flex; gap: 24px; width: 100%; }
 .weightInput .input { flex: 1; }
 .weightUnitSelect { padding: 10px 8px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary); font-size: 13px; min-width: 60px; cursor: pointer; }
 
-.checkboxLabel { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-primary); cursor: pointer; }
+.checkboxLabel { display: flex; align-items: center; gap: 24px; font-size: 13px; color: var(--text-primary); cursor: pointer; }
 .checkboxLabel input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent-cyan); }
 
 .hint { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
 
-.formError { background: var(--danger-bg); border: 1px solid rgba(255,71,87,0.3); color: var(--danger); padding: 10px 14px; border-radius: var(--radius-md); font-size: 13px; margin-bottom: 16px; }
+.formError { background: var(--danger-bg); border: 1px solid rgba(255,71,87,0.3); color: var(--danger); padding: 10px 14px; border-radius: var(--radius-md); font-size: 13px; margin-bottom: 24px; }
 .formActions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
-.cancelBtn { padding: 10px 20px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-secondary); font-size: 13.5px; font-weight: 500; transition: var(--transition); cursor: pointer; }
+.cancelBtn { padding: 12px 24px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-secondary); font-size: 13.5px; font-weight: 500; transition: var(--transition); cursor: pointer; }
 .cancelBtn:hover { background: var(--bg-card-hover); color: var(--text-primary); }
 .saveBtn { padding: 10px 24px; background: linear-gradient(135deg, var(--success), #00a868); color: white; border: none; border-radius: var(--radius-md); font-size: 13.5px; font-weight: 600; transition: var(--transition); cursor: pointer; box-shadow: 0 4px 12px rgba(0,208,132,0.25); }
 .saveBtn:hover:not(:disabled) { transform: translateY(-1px); }
@@ -169,3 +169,5 @@ select.input option { background: #111c33; }
   .header { flex-direction: column; align-items: stretch; }
   .addBtn { width: 100%; justify-content: center; }
 }
+
+
