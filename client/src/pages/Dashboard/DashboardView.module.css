@@ -1,13 +1,18 @@
+/* Page shell composed from shared.module.css for app-wide consistency.
+   Adjust the import path below if your folder structure differs.
+   Everything below (pulse strip, stat cards, alert feed, trip stack) is
+   intentionally its own ops-board system, shared with DispatchView. */
+
 .page {
-  padding: 24px 28px 32px;
+  composes: page from '../../styles/shared.module.css';
   max-width: 1280px;
+  padding: 24px 28px 32px;
   margin: 0 auto;
 }
 
 .pageHeader {
-  display: flex;
+  composes: header from '../../styles/shared.module.css';
   align-items: flex-end;
-  justify-content: space-between;
   gap: 16px;
   margin-bottom: 16px;
   flex-wrap: wrap;
@@ -21,20 +26,18 @@
   letter-spacing: 1.2px;
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 6px;
   margin-bottom: 8px;
 }
 
 .pageTitle {
+  composes: pageTitle from '../../styles/shared.module.css';
   font-size: 32px;
-  font-weight: 800;
-  color: var(--text-primary);
   letter-spacing: -1.1px;
 }
 
 .pageSub {
-  color: var(--text-secondary);
-  font-size: 13px;
+  composes: pageSub from '../../styles/shared.module.css';
   margin-top: 6px;
 }
 
@@ -106,7 +109,7 @@
 .refreshBtn {
   display: inline-flex;
   align-items: center;
-  gap: 24px;
+  gap: 8px;
   padding: 9px 16px;
   background: linear-gradient(135deg, rgba(0, 212, 255, 0.15), rgba(79, 142, 247, 0.12));
   border: 1px solid rgba(0, 212, 255, 0.35);
@@ -157,7 +160,7 @@
 .pulseItem {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 12px;
   padding: 14px 16px;
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
@@ -351,7 +354,7 @@
   font-weight: 800;
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 8px;
 }
 
 .panelHead h2 svg {
@@ -475,7 +478,7 @@
 .alertTop {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 8px;
   margin-bottom: 3px;
 }
 
@@ -611,13 +614,13 @@
 .shortcuts {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 24px;
+  gap: 10px;
 }
 
 .shortcut {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 8px;
   padding: 14px 16px;
   border-radius: var(--radius-md);
   border: 1px solid var(--glass-border);

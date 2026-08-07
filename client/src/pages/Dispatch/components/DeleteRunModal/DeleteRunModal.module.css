@@ -1,0 +1,76 @@
+.deleteConfirmContent {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.deleteWarningHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  background: rgba(255, 82, 82, 0.1);
+  border: 1px solid rgba(255, 82, 82, 0.3);
+  border-radius: 8px;
+  color: #ff5252;
+  font-weight: 600;
+}
+
+.deleteConfirmContent ul {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--text-secondary);
+}
+
+.deleteConfirmContent ul li {
+  margin-bottom: 6px;
+}
+
+.confirmButtons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.cancelBtn {
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cancelBtn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+.deleteBtn {
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: none;
+  background: #ff5252;
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(255, 82, 82, 0.3);
+}
+
+.deleteBtn:hover {
+  background: #ff3333;
+}
+
+.error {
+  background: var(--danger-bg);
+  border: 1px solid rgba(255, 71, 87, 0.25);
+  color: #ff9ca5;
+  padding: 10px 13px;
+  border-radius: 8px;
+  font-size: 13px;
+}

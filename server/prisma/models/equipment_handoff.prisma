@@ -22,72 +22,79 @@ enum EquipmentHandoffReason {
 }
 
 model EquipmentHandoff {
-  id              String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // What happened
-  action          EquipmentHandoffAction
-  reason          EquipmentHandoffReason?
-  reasonNote      String?
-  
+  action     EquipmentHandoffAction
+  reason     EquipmentHandoffReason?
+  reasonNote String?
+
   // Who - Driver (primary)
-  driverId        String
-  driver          Driver   @relation(fields: [driverId], references: [id])
-  
+  driverId String
+  driver   Driver @relation(fields: [driverId], references: [id])
+
   // Who - Dispatcher (optional approver)
-  dispatcherId    String?
-  dispatcher      Driver?  @relation("ApproverDriver", fields: [dispatcherId], references: [id])
-  
+  dispatcherId String?
+  dispatcher   Driver? @relation("ApproverDriver", fields: [dispatcherId], references: [id])
+
   // Equipment involved (primary)
-  equipmentId     String
-  equipment       Equipment @relation(fields: [equipmentId], references: [id])
-  
+  equipmentId String
+  equipment   Equipment @relation(fields: [equipmentId], references: [id])
+
   // For swaps: what was replaced
   replacedEquipmentId String?
   replacedEquipment   Equipment? @relation("ReplacedEquipment", fields: [replacedEquipmentId], references: [id])
-  
+
   // Trailer tracking
-  trailerId       String?
-  trailer         Equipment? @relation("TrailerHandoff", fields: [trailerId], references: [id])
+  trailerId         String?
+  trailer           Equipment? @relation("TrailerHandoff", fields: [trailerId], references: [id])
   previousTrailerId String?
-  
+
+  // ── Dispatch link ──
+  // null = morning handoff / board check-in / swap (do NOT release on trip cancel)
+  // set  = created by POST /dispatch or /backups (safe to release on trip cancel)
+  tripId String?
+  trip   Trip?   @relation(fields: [tripId], references: [id], onDelete: SetNull)
+
   // Timing
-  checkOutTime    DateTime @default(now())
-  returnTime      DateTime?
-  shiftStartTime  DateTime?
-  shiftEndTime    DateTime?
-  
+  checkOutTime   DateTime  @default(now())
+  returnTime     DateTime?
+  shiftStartTime DateTime?
+  shiftEndTime   DateTime?
+
   // Location
   checkOutLocation String?
-  returnLocation  String?
-  
+  returnLocation   String?
+
   // Vehicle data
-  odometerStart   Int?
-  fuelLevelStart  String?
-  odometerEnd     Int?
-  fuelLevelEnd    String?
-  
+  odometerStart  Int?
+  fuelLevelStart String?
+  odometerEnd    Int?
+  fuelLevelEnd   String?
+
   // Condition checks
-  preTripCompleted Boolean @default(false)
-  preTripNotes    String?
+  preTripCompleted  Boolean @default(false)
+  preTripNotes      String?
   postTripCompleted Boolean @default(false)
-  postTripNotes   String?
-  
+  postTripNotes     String?
+
   // Damage reporting
-  damageReported  Boolean @default(false)
+  damageReported    Boolean @default(false)
   damageDescription String?
-  damagePhoto     String?
-  
+  damagePhoto       String?
+
   // Status tracking
-  isActive        Boolean @default(true)
-  returnedBy      String?
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
+  isActive   Boolean @default(true)
+  returnedBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([driverId])
   @@index([equipmentId])
   @@index([trailerId])
   @@index([checkOutTime])
   @@index([isActive])
   @@index([action])
+  @@index([tripId])
 }

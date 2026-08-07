@@ -1,7 +1,7 @@
 .backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(7, 13, 26, 0.85);
+  background: var(--modal-backdrop);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   z-index: 1000;
@@ -18,10 +18,10 @@
 }
 
 .modal {
-  background: linear-gradient(145deg, #0d1526, #111c33);
-  border: 1px solid var(--glass-border);
+  background: var(--modal-bg);
+  border: 1px solid var(--border);
   border-radius: var(--radius-xl);
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(79, 142, 247, 0.1);
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
   max-height: 90vh;
@@ -44,6 +44,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 22px 28px 18px;
+  background: var(--modal-header-bg);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -58,7 +59,7 @@
 .closeBtn {
   width: 32px;
   height: 32px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text-secondary);
@@ -81,3 +82,20 @@
   overflow-y: auto;
   flex: 1;
 }
+
+@media (max-width: 640px) {
+  .backdrop {
+    padding: 12px 10px;
+  }
+  .modal {
+    max-height: 94vh;
+    border-radius: var(--radius-lg);
+  }
+  .header {
+    padding: 16px 18px 14px;
+  }
+  .body {
+    padding: 16px 18px;
+  }
+}
+

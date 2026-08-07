@@ -1,10 +1,11 @@
 // client/src/pages/Imports/ImportsView.jsx
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faPlus,
   faPencil,
   faTrash,
+  faPrint,
   faPlaneArrival,
   faMagnifyingGlass,
   faTriangleExclamation,
@@ -24,6 +25,7 @@ import {
   faThLarge,
   faChevronDown,
 } from "@fortawesome/free-solid-svg-icons";
+import { useReactToPrint } from "react-to-print";
 import {
   getShipments,
   createShipment,
@@ -34,6 +36,9 @@ import {
 } from "../../api/api.js";
 import Modal from "../../components/Modal/Modal.jsx";
 import StatusBadge from "../../components/StatusBadge/StatusBadge.jsx";
+import DateTimePicker, { toLocalISO } from "../../styles/Datetimepicker.jsx";
+// Template lives at src/pages/Import/templates/ (adjust if you move it under Imports/)
+import CevaTemplate from "../Imports/Templates/Ceva-template.jsx";
 import styles from "./ImportsView.module.css";
 import tableStyles from "./ImportsView.table.module.css";
 
@@ -136,7 +141,6 @@ export default function ImportsView() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [selectedAirline, setSelectedAirline] = useState(null);
-
   const VIEW_KEY = "importsViewMode";
   const [viewMode, setViewMode] = useState(() => {
     try { return localStorage.getItem(VIEW_KEY) || "cards"; } catch { return "cards"; }
@@ -153,6 +157,26 @@ export default function ImportsView() {
       return next;
     });
   };
+
+  // ── Print permit (react-to-print) ─────────────────────────────
+  const printRef = useRef(null);
+  const [printJob, setPrintJob] = useState(null); // { shipment, nonce }
+
+  const triggerPrint = useReactToPrint({
+    contentRef: printRef, // react-to-print v2: use content: () => printRef.current
+    documentTitle: printJob
+      ? `CEVA-Permit-${printJob.shipment.awbDisplay || printJob.shipment.airwaybillNumber || "draft"}`
+      : "CEVA-Permit",
+  });
+
+  const requestPrint = (s) => setPrintJob({ shipment: s, nonce: Date.now() });
+
+  useEffect(() => {
+    if (!printJob) return;
+    const t = setTimeout(() => triggerPrint(), 150); // wait for template to render
+    return () => clearTimeout(t);
+  }, [printJob, triggerPrint]);
+  // ───────────────────────────────────────────────────────────────
 
   const load = useCallback(async () => {
     try {
@@ -246,15 +270,12 @@ export default function ImportsView() {
         pmcCount: Number(form.pmcCount) || 0,
         isGDP: form.isGDP || false,
       };
-
       if (!payload.airwaybillNumber) throw new Error("Enter the AWB number");
       if (!payload.ordNumber) throw new Error("Enter the ORD number");
       if (!payload.pieces) throw new Error("Enter the number of pieces");
       if (!payload.weight) throw new Error("Enter the weight");
-
       if (editing) await updateShipment(editing.id, payload);
       else await createShipment(payload);
-
       await load();
       closeModal();
     } catch (err) {
@@ -312,16 +333,19 @@ export default function ImportsView() {
     filtered.forEach((s) => {
       const key = s.airline?.id || "unassigned";
       if (!byAirline.has(key)) {
-        byAirline.set(key, {
-          key,
-          name: s.airline?.name || "No airline set",
-          code: s.airline?.code || "—",
-          items: [],
-          color: airlineColor(key),
-        });
+        byAirLineSet(key, s);
       }
       byAirline.get(key).items.push(s);
     });
+    function byAirLineSet(key, s) {
+      byAirline.set(key, {
+        key,
+        name: s.airline?.name || "No airline set",
+        code: s.airline?.code || "—",
+        items: [],
+        color: airlineColor(key),
+      });
+    }
     return [...byAirline.values()].sort(
       (a, b) => b.items.length - a.items.length,
     );
@@ -344,15 +368,23 @@ export default function ImportsView() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div className={tableStyles.viewToggle} role="group" aria-label="View mode">
-            <button type="button"
+            <button
+              type="button"
               className={`${tableStyles.toggleBtn} ${viewMode === "cards" ? tableStyles.toggleBtnActive : ""}`}
-              onClick={() => switchView("cards")} title="Card view" aria-pressed={viewMode === "cards"}>
-              <FontAwesomeIcon icon={faThLarge} /><span className={tableStyles.toggleLabel}>Cards</span>
+              onClick={() => switchView("cards")}
+              title="Card view"
+              aria-pressed={viewMode === "cards"}
+            >
+              <FontAwesomeIcon icon={faThLarge} /> <span className={tableStyles.toggleLabel}>Cards</span>
             </button>
-            <button type="button"
+            <button
+              type="button"
               className={`${tableStyles.toggleBtn} ${viewMode === "table" ? tableStyles.toggleBtnActive : ""}`}
-              onClick={() => switchView("table")} title="Table view" aria-pressed={viewMode === "table"}>
-              <FontAwesomeIcon icon={faTable} /><span className={tableStyles.toggleLabel}>Table</span>
+              onClick={() => switchView("table")}
+              title="Table view"
+              aria-pressed={viewMode === "table"}
+            >
+              <FontAwesomeIcon icon={faTable} /> <span className={tableStyles.toggleLabel}>Table</span>
             </button>
           </div>
           <button className={styles.addBtn} onClick={openAdd} id="add-import-btn">
@@ -551,6 +583,13 @@ export default function ImportsView() {
                         </td>
                         <td onClick={(e) => e.stopPropagation()}>
                           <div className={tableStyles.actions}>
+                            <button
+                              className={`${tableStyles.actionBtn} ${tableStyles.printBtn}`}
+                              onClick={() => requestPrint(s)}
+                              title="Print permit"
+                            >
+                              <FontAwesomeIcon icon={faPrint} />
+                            </button>
                             <button className={`${tableStyles.actionBtn} ${tableStyles.editBtn}`} onClick={() => openEdit(s)} title="Edit">
                               <FontAwesomeIcon icon={faPencil} />
                             </button>
@@ -650,7 +689,6 @@ export default function ImportsView() {
                   s.airline?.awbPrefix && s.airwaybillNumber
                     ? `${s.airline.awbPrefix}-${s.airwaybillNumber}`
                     : s.airwaybillNumber;
-
                 return (
                   <div
                     key={s.id}
@@ -676,6 +714,13 @@ export default function ImportsView() {
                       </div>
                       <div className={styles.cardActions}>
                         <button
+                          className={styles.printBtn}
+                          onClick={() => requestPrint(s)}
+                          title="Print permit"
+                        >
+                          <FontAwesomeIcon icon={faPrint} />
+                        </button>
+                        <button
                           className={styles.editBtn}
                           onClick={() => openEdit(s)}
                           title="Edit"
@@ -691,7 +736,6 @@ export default function ImportsView() {
                         </button>
                       </div>
                     </div>
-
                     <div className={styles.cardBody}>
                       <div className={styles.row}>
                         <div className={styles.field}>
@@ -858,7 +902,6 @@ export default function ImportsView() {
       >
         <form onSubmit={handleSubmit} id="import-form" className={styles.form}>
           {error && <div className={styles.formError}>{error}</div>}
-
           <div className={styles.formSectionLabel}>Permit Identifiers</div>
           <div className={styles.formGrid}>
             <div className={styles.formGroup}>
@@ -914,7 +957,6 @@ export default function ImportsView() {
               />
             </div>
           </div>
-
           <div className={styles.formSectionLabel}>Destination & Cargo</div>
           <div className={styles.formGrid}>
             <div className={styles.formGroup}>
@@ -990,17 +1032,17 @@ export default function ImportsView() {
               />
             </div>
           </div>
-
           <div className={styles.formSectionLabel}>Timing & Fees</div>
           <div className={styles.formGrid}>
             <div className={styles.formGroup}>
               <label className={styles.label}>Last Free Day</label>
-              <input
-                className={styles.input}
-                type="date"
-                value={form.lastFreeDay}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, lastFreeDay: e.target.value }))
+              <DateTimePicker
+                value={form.lastFreeDay || ""}
+                onChange={(date) =>
+                  setForm((f) => ({
+                    ...f,
+                    lastFreeDay: date ? toLocalISO(date, { dateOnly: true }) : "",
+                  }))
                 }
               />
             </div>
@@ -1034,12 +1076,13 @@ export default function ImportsView() {
             </div>
             <div className={styles.formGroup}>
               <label className={styles.label}>Airline Cargo Available</label>
-              <input
-                className={styles.input}
-                type="datetime-local"
+              <DateTimePicker
                 value={form.pickupReadyAt || ""}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, pickupReadyAt: e.target.value }))
+                onChange={(date) =>
+                  setForm((f) => ({
+                    ...f,
+                    pickupReadyAt: date ? toLocalISO(date) : "",
+                  }))
                 }
               />
             </div>
@@ -1047,20 +1090,17 @@ export default function ImportsView() {
               <label className={styles.label}>
                 Warehouse Delivery Appointment
               </label>
-              <input
-                className={styles.input}
-                type="datetime-local"
+              <DateTimePicker
                 value={form.deliveryAppointmentAt || ""}
-                onChange={(e) =>
+                onChange={(date) =>
                   setForm((f) => ({
                     ...f,
-                    deliveryAppointmentAt: e.target.value,
+                    deliveryAppointmentAt: date ? toLocalISO(date) : "",
                   }))
                 }
               />
             </div>
           </div>
-
           <div className={styles.formSectionLabel}>
             Special Handling & Status
           </div>
@@ -1140,7 +1180,6 @@ export default function ImportsView() {
               </select>
             </div>
           </div>
-
           <div className={styles.formSectionLabel}>Notes</div>
           <div className={styles.formGrid}>
             <div className={`${styles.formGroup} ${styles.fullWidth}`}>
@@ -1154,7 +1193,6 @@ export default function ImportsView() {
               />
             </div>
           </div>
-
           <div className={styles.formActions}>
             <button
               type="button"
@@ -1198,8 +1236,41 @@ export default function ImportsView() {
           </button>
         </div>
       </Modal>
+
+      {/* ── Hidden print-only render of the CEVA permit ── */}
+      <div style={{ display: "none" }} aria-hidden="true">
+        {printJob && (
+          <div ref={printRef}>
+            <CevaTemplate
+              shipment={printJob.shipment}
+              airline={
+                // Prefer full airline (includes terminalAddress) over the
+                // partial relation embedded on the shipment.
+                airlines.find((a) => a.id === printJob.shipment.airline?.id) ||
+                printJob.shipment.airline
+              }
+              warehouse={
+                // Prefer the full warehouse record (has address fields) over
+                // the partial relation embedded on the shipment (often just id/name).
+                warehouses.find((w) => w.id === printJob.shipment.warehouse?.id) ||
+                printJob.shipment.warehouse
+              }
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
 
 

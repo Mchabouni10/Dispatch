@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Routes, Route } from "react-router-dom";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faBars, faMoon, faSun } from "@fortawesome/free-solid-svg-icons";
 import Sidebar from "./components/Sidebar/Sidebar.jsx";
 import DashboardView from "./pages/Dashboard/DashboardView.jsx";
 import DriversView from "./pages/Drivers/DriversView.jsx";
@@ -15,6 +17,7 @@ import AnalyticsView from "./pages/Analytics/AnalyticsView.jsx";
 import styles from "./App.module.css";
 import AuthView from "./pages/Auth/AuthView.jsx";
 import { clearAuthToken, getAuthToken, getCurrentUser } from "./api/api.js";
+import logo from "../images/app-logo.jpeg";
 
 const getInitialTheme = () => {
   if (typeof window === "undefined") return "dark";
@@ -31,6 +34,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [theme, setTheme] = useState(getInitialTheme);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -57,11 +61,37 @@ export default function App() {
 
   return (
     <div className={styles.app}>
+      {/* Mobile top header bar */}
+      <header className={styles.mobileHeader}>
+        <button
+          type="button"
+          className={styles.hamburgerBtn}
+          onClick={() => setMobileNavOpen(true)}
+          aria-label="Open menu"
+        >
+          <FontAwesomeIcon icon={faBars} />
+        </button>
+        <div className={styles.mobileBrand}>
+          <img src={logo} alt="Geanto's Trucking" className={styles.mobileLogo} />
+          <span>Geanto's Trucking</span>
+        </div>
+        <button
+          type="button"
+          className={styles.mobileThemeBtn}
+          onClick={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
+          aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+        >
+          <FontAwesomeIcon icon={theme === "light" ? faMoon : faSun} />
+        </button>
+      </header>
+
       <Sidebar
         user={user}
         theme={theme}
         onToggleTheme={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
         onLogout={() => { clearAuthToken(); setUser(null); }}
+        isOpen={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
       />
       <main className={styles.main}>
         <Routes>
@@ -81,3 +111,4 @@ export default function App() {
     </div>
   );
 }
+

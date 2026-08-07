@@ -1,0 +1,317 @@
+/* DateTimePicker.module.css
+   Themed replacement for the native <input type="datetime-local"> picker.
+   Uses only tokens from styles/index.css, so it follows dark/light theme
+   automatically. Adjust the composes import path below if your folder
+   structure differs. */
+
+.wrap {
+  position: relative;
+  width: 100%;
+}
+
+/* ── Trigger (looks like .input from shared.module.css) ── */
+.trigger {
+  composes: input from './shared.module.css';
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+}
+
+.trigger:hover {
+  border-color: var(--border-hover);
+}
+
+.trigger:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79, 142, 247, 0.1);
+}
+
+.trigger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.triggerValue {
+  color: var(--text-primary);
+  font-size: 13.5px;
+}
+
+.triggerPlaceholder {
+  color: var(--text-muted);
+  font-size: 13.5px;
+}
+
+.triggerIcon {
+  color: var(--text-secondary);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* ── Panel ──
+   Rendered through a portal to document.body and positioned with inline
+   top/left (position: fixed) computed from the trigger's real screen
+   coordinates. This keeps it immune to any ancestor's overflow:hidden/auto
+   — e.g. a modal's scrollable body — which is what clips position:absolute
+   dropdowns nested inside one. */
+.panel {
+  position: fixed;
+  z-index: 1000;
+  width: max-content;
+  max-width: 90vw;
+  background: var(--bg-secondary);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: panelIn 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.panelBody {
+  display: flex;
+  align-items: stretch;
+}
+
+/* ── Calendar side ── */
+.calendarSide {
+  padding: 14px 16px;
+  border-right: 1px solid var(--border);
+}
+
+.monthRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.monthLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.monthNav {
+  display: flex;
+  gap: 4px;
+}
+
+.navBtn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.navBtn:hover {
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+  background: var(--bg-card-hover);
+}
+
+.dayLabelRow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 4px;
+}
+
+.dayLabel {
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 4px 0;
+}
+
+.dayGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.dayCell {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.dayCell:hover {
+  background: var(--bg-card-hover);
+}
+
+.dayCellMuted {
+  color: var(--text-muted);
+}
+
+.dayCellToday {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  font-weight: 700;
+}
+
+.dayCellSelected,
+.dayCellSelected:hover {
+  background: linear-gradient(135deg, var(--accent), var(--accent-cyan));
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(79, 142, 247, 0.35);
+}
+
+/* ── Time side ── */
+.timeSide {
+  display: flex;
+  gap: 2px;
+  padding: 14px 10px;
+}
+
+.timeCol {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  max-height: 224px;
+  padding: 0 2px;
+}
+
+.timeCol::-webkit-scrollbar {
+  width: 4px;
+}
+
+.timeCell {
+  width: 44px;
+  padding: 6px 0;
+  text-align: center;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.timeCell:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.timeCellActive,
+.timeCellActive:hover {
+  background: rgba(79, 142, 247, 0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ampmCol {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 2px;
+}
+
+.ampmCell {
+  width: 40px;
+  padding: 8px 0;
+  text-align: center;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.ampmCell:hover {
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+}
+
+.ampmCellActive,
+.ampmCellActive:hover {
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(79, 142, 247, 0.35);
+}
+
+/* ── Footer ── */
+.panelFooter {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.clearBtn,
+.todayBtn {
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 6px;
+  transition: var(--transition);
+}
+
+.clearBtn {
+  color: var(--text-secondary);
+}
+
+.clearBtn:hover {
+  color: var(--danger);
+}
+
+.todayBtn {
+  color: var(--accent);
+}
+
+.todayBtn:hover {
+  color: var(--accent-cyan);
+}
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .panelBody {
+    flex-direction: column;
+  }
+  .calendarSide {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .timeSide {
+    padding: 10px 14px 14px;
+  }
+}

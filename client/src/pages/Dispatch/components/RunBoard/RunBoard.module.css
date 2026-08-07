@@ -1,0 +1,234 @@
+.tripList {
+  padding: 24px;
+  display: grid;
+  gap: 24px;
+}
+
+.tripCard {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.018);
+  position: relative;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.tripCard::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--accent-cyan), transparent);
+  opacity: 0.7;
+}
+
+.tripCard:hover {
+  border-color: var(--border-hover);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
+}
+
+.tripTop,
+.tripFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  padding: 15px 16px;
+}
+
+.tripNumber {
+  color: var(--accent-cyan);
+  font-weight: 800;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.runTypeTag {
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  background: rgba(79, 142, 247, 0.14);
+  color: #93d6ff;
+}
+
+.runTypeExport {
+  background: var(--purple-bg);
+  color: #d6b7ff;
+}
+
+.tripMeta,
+.tripFooter span {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.tripActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.actionIconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.actionIconButton:hover {
+  color: #ffffff;
+  border-color: var(--accent-cyan);
+  background: rgba(0, 212, 255, 0.1);
+}
+
+.dangerIcon:hover {
+  color: #ff5252;
+  border-color: rgba(255, 82, 82, 0.4);
+  background: rgba(255, 82, 82, 0.12);
+}
+
+/* ── Route flow ── */
+
+.tripRouteFlow {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 20px 24px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  margin: 10px 16px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.routePoint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-primary);
+}
+
+.routePoint svg {
+  color: var(--accent-cyan);
+  font-size: 11px;
+}
+
+.routeConnector {
+  color: var(--accent-cyan);
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+/* ── Manifest ── */
+
+.manifest {
+  border-top: 1px solid var(--border);
+}
+
+.manifestRow {
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.manifestRow:last-child {
+  border: 0;
+}
+
+.manifestRow > div:first-child {
+  display: grid;
+  grid-template-columns: 65px 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.manifestRow strong {
+  font-size: 13px;
+}
+
+.manifestRow span:not(.direction) {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.direction {
+  display: inline-block;
+  width: max-content;
+  padding: 3px 7px;
+  border-radius: 5px;
+  color: #93d6ff !important;
+  background: rgba(79, 142, 247, 0.14);
+  font-size: 10px !important;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* ── Footer ── */
+
+.tripFooter {
+  border-top: 1px solid var(--border);
+}
+
+.tripFooter button {
+  color: var(--accent-cyan);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tripFooter button.complete {
+  color: var(--success);
+}
+
+/* ── Empty state ── */
+
+.empty {
+  min-height: 250px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.empty svg {
+  font-size: 25px;
+  color: var(--accent-cyan);
+}
+
+.empty strong {
+  color: var(--text-primary);
+}
+
+@media (max-width: 700px) {
+  .manifestRow > div:first-child {
+    grid-template-columns: 1fr;
+  }
+}

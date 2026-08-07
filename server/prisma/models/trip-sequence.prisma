@@ -1,0 +1,9 @@
+// ============================================================
+// MODEL: TripSequence
+// Atomic counter for generating unique trip numbers.
+// The database locks this row during concurrent transactions.
+// ============================================================
+model TripSequence {
+  id       Int @id @default(1)
+  lastUsed Int @default(0)
+}

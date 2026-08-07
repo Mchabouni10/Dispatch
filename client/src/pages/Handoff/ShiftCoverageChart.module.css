@@ -1,0 +1,234 @@
+/* ═══════════════════════════════════════════════════════════════════
+   24-Hour Coverage chart — drop-in section for the Handoff Board.
+   Reuses the same CSS custom properties as HandoffView.module.css
+   (--bg-card, --border, --accent, --success, --warning, --danger,
+   --text-primary, --text-secondary, --text-muted) so it inherits the
+   board's theme automatically. No new tokens required.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.coverageSection {
+  margin-bottom: 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.coverageHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--border);
+}
+
+.coverageHeader > svg {
+  color: var(--accent-cyan, var(--accent));
+  font-size: 13px;
+}
+
+.coverageSub {
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.coverageGapBadge {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--danger-bg, rgba(255, 71, 87, 0.12));
+  color: var(--danger);
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ── Hourly headcount bars ── */
+.coverageChart {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 16px 16px 6px;
+  height: 120px;
+}
+
+.coverageNowLine {
+  position: absolute;
+  top: 0;
+  bottom: 22px;
+  width: 2px;
+  background: var(--accent-cyan, #5ce1e6);
+  box-shadow: 0 0 6px var(--accent-cyan, #5ce1e6);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.coverageBarCol {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  height: 100%;
+}
+
+.coverageBarTrack {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.coverageBar {
+  width: 68%;
+  min-height: 0;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(180deg, var(--accent), var(--accent-cyan, var(--accent)));
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  transition: height 0.2s ease;
+}
+
+.coverageBarEmpty {
+  width: 68%;
+  height: 3px !important;
+  background: var(--danger);
+  opacity: 0.55;
+  border-radius: 2px;
+}
+
+.coverageBarValue {
+  margin-top: -16px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.coverageAxisLabel {
+  margin-top: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ── Gap callouts ── */
+.coverageGapList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 16px 12px;
+}
+
+.coverageGapItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--danger-bg, rgba(255, 71, 87, 0.1));
+  border: 1px solid rgba(255, 71, 87, 0.3);
+  border-radius: 8px;
+  color: var(--danger);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ── Per-driver timeline rows ── */
+.coverageGantt {
+  border-top: 1px solid var(--border);
+  padding: 10px 16px 14px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.coverageRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+}
+
+.coverageRowLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 130px;
+  flex-shrink: 0;
+}
+
+.coverageAvatar,
+.coverageAvatarFallback {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.coverageAvatarFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, var(--accent), var(--accent-cyan, var(--accent)));
+  color: #fff;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.coverageRowName {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coverageRowTrack {
+  position: relative;
+  flex: 1;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 5px;
+}
+
+.coverageRowBar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 5px;
+}
+
+.coverageRowBarActive {
+  background: linear-gradient(90deg, var(--success), var(--accent-cyan, var(--success)));
+}
+
+.coverageRowBarPending {
+  background: var(--text-muted);
+  opacity: 0.55;
+}
+
+@media (max-width: 720px) {
+  .coverageAxisLabel {
+    display: none;
+  }
+  .coverageRowLabel {
+    width: 90px;
+  }
+}

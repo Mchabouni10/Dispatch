@@ -4,34 +4,82 @@
    the primary signal, equipment is a chip, actions stay one-tap.
    ═══════════════════════════════════════════════════════════════════ */
 
+/* Page shell composed from shared.module.css for app-wide consistency.
+   Adjust the import path below if your folder structure differs.
+   Everything below the shell (board, cards, chips, modals) is intentionally
+   its own dense ops-board system — see header comment. */
+
 .page {
+  composes: page from '../../styles/shared.module.css';
   max-width: 1280px;
   padding-bottom: 40px;
 }
 
 .header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  composes: header from '../../styles/shared.module.css';
   gap: 20px;
-  margin-bottom: 24px;
-  flex-wrap: wrap;
+  align-items: flex-start;
 }
 
 .pageTitle {
+  composes: pageTitle from '../../styles/shared.module.css';
   font-size: 24px;
-  font-weight: 800;
-  color: var(--text-primary);
   letter-spacing: -0.6px;
   line-height: 1.15;
 }
 
 .pageSub {
-  color: var(--text-secondary);
+  composes: pageSub from '../../styles/shared.module.css';
   font-size: 12.5px;
-  margin-top: 5px;
   max-width: 420px;
   line-height: 1.45;
+}
+
+.headerRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+/* ── Live clock + date ── */
+.liveClock {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  min-width: 180px;
+}
+
+.liveClock > svg {
+  font-size: 16px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.clockText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.clockDate {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+
+.clockTime {
+  font-size: 13.5px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-cyan);
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.3px;
 }
 
 .cooldownSummary {
@@ -58,11 +106,12 @@
   font-family: ui-monospace, monospace;
 }
 
+/* ── Stats bar ── */
 .statsBar {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
-  gap: 24px;
-  margin-bottom: 24px;
+  gap: 10px;
+  margin-bottom: 18px;
 }
 
 .statCard {
@@ -90,6 +139,9 @@
 .statNotIn::after { background: var(--text-muted); }
 .statLate::after { background: var(--danger); }
 .statCooldown::after { background: var(--warning); }
+.statSoon::after { background: #f0b429; }
+.statSoonUrgent::after { background: #ff6b35; }
+.statPastEnd::after { background: #ff4757; }
 
 .statValue {
   display: block;
@@ -115,7 +167,280 @@
 .statBreak .statValue { color: #8bb8ff; }
 .statLate .statValue { color: var(--danger); }
 .statCooldown .statValue { color: var(--warning); }
+.statSoon .statValue { color: #f0b429; }
+.statSoonUrgent .statValue { color: #ff6b35; }
+.statPastEnd .statValue { color: #ff4757; }
 
+/* ── Showing Soon section ── */
+.showingSoonSection {
+  margin-bottom: 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.showingSoonHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--border);
+}
+
+.showingSoonHeader > svg {
+  color: #f0b429;
+  font-size: 13px;
+}
+
+.showingSoonCount {
+  margin-right: auto;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.showingSoonMuteBtn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  flex-shrink: 0;
+  transition: var(--transition);
+}
+
+.showingSoonMuteBtn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.showingSoonList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+.showingSoonCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px 8px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  min-width: 240px;
+  flex: 1 1 240px;
+  max-width: 320px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.showingSoonTop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.showingSoonBottom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+
+.showingSoonActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.equipReadyBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: 100px;
+  white-space: nowrap;
+}
+
+.equipReady {
+  background: rgba(46, 204, 113, 0.14);
+  color: #4ade80;
+}
+
+.equipNotReady {
+  background: rgba(255, 71, 87, 0.14);
+  color: #ff6b6b;
+}
+
+.showingSoonCallBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
+  transition: var(--transition);
+  text-decoration: none;
+}
+
+.showingSoonCallBtn:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+}
+
+.showingSoonMoreBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px;
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.showingSoonMoreBtn:hover {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+}
+
+.showingSoonCard:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--border-hover);
+}
+
+.showingSoonNear {
+  border-color: rgba(240, 180, 41, 0.4);
+  background: rgba(240, 180, 41, 0.06);
+}
+
+.showingSoonUrgent {
+  border-color: rgba(255, 107, 53, 0.45);
+  background: rgba(255, 107, 53, 0.08);
+}
+
+.showingSoonAvatar,
+.showingSoonAvatarFallback {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.showingSoonAvatar {
+  object-fit: cover;
+}
+
+.showingSoonAvatarFallback {
+  background: linear-gradient(145deg, var(--accent), var(--accent-cyan));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: white;
+}
+
+.showingSoonInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.showingSoonName {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.showingSoonMeta {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  margin-top: 1px;
+}
+
+.showingSoonBadge {
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  padding: 3px 8px;
+  border-radius: 100px;
+  white-space: nowrap;
+}
+
+.badgeUrgent {
+  background: rgba(255, 107, 53, 0.18);
+  color: #ff8a65;
+}
+
+.badgeNear {
+  background: rgba(240, 180, 41, 0.16);
+  color: #f0b429;
+}
+
+.badgeLater {
+  background: rgba(91, 157, 255, 0.14);
+  color: #8bb8ff;
+}
+
+.showingSoonCheckIn {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  border: 0;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
+  transition: filter 0.15s ease;
+}
+
+.showingSoonCheckIn:hover {
+  filter: brightness(1.1);
+}
+
+.showingSoonCheckIn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Form error ── */
 .formError {
   padding: 10px 14px;
   background: var(--danger-bg);
@@ -126,6 +451,7 @@
   margin-bottom: 14px;
 }
 
+/* ── Board columns ── */
 .board {
   display: grid;
   grid-template-columns: minmax(280px, 0.95fr) minmax(340px, 1.25fr);
@@ -185,6 +511,7 @@
   line-height: 1.5;
 }
 
+/* ── Cards ── */
 .card {
   position: relative;
   background: transparent;
@@ -208,11 +535,15 @@
 
 .cardIdle::before { background: var(--text-muted); }
 .cardLate::before { background: var(--danger); }
+.cardArriving::before { background: #f0b429; }
 .status_Available::before { background: var(--success); }
 .status_Break::before { background: #5b9dff; }
 
 .breakOverCard { background: rgba(255, 179, 71, 0.05); }
 .breakOverCard::before { background: var(--warning); }
+
+.pastEndCard { background: rgba(255, 71, 87, 0.04); }
+.pastEndCard::before { background: #ff4757; }
 
 .card:hover {
   background: rgba(255, 255, 255, 0.025);
@@ -347,6 +678,20 @@
   color: #ff8a95;
 }
 
+.arrivingTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  background: rgba(240, 180, 41, 0.12);
+  border: 1px solid rgba(240, 180, 41, 0.3);
+  color: #f0b429;
+}
+
 .notScheduledTag {
   display: inline-flex;
   align-items: center;
@@ -385,6 +730,20 @@
   gap: 5px;
   flex-wrap: wrap;
   font-variant-numeric: tabular-nums;
+}
+
+.onShiftDuration {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.shiftRemaining {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  font-weight: 600;
 }
 
 .lateInline { color: #ff8a95; font-weight: 700; }
@@ -492,6 +851,7 @@
   background: linear-gradient(135deg, #ffc857, #e8a317);
 }
 
+/* ── Forms ── */
 .form {
   display: flex;
   flex-direction: column;
@@ -501,7 +861,7 @@
 .formIntro {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 6px;
   font-size: 12.5px;
   color: var(--text-secondary);
 }
@@ -509,7 +869,7 @@
 .formSchedule {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 6px;
   font-size: 12.5px;
   color: var(--text-secondary);
   margin: -6px 0 0;
@@ -519,7 +879,7 @@
 .truckGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
-  gap: 24px;
+  gap: 10px;
   max-height: 300px;
   overflow-y: auto;
   padding: 2px;
@@ -578,7 +938,7 @@
 .formActions {
   display: flex;
   justify-content: flex-end;
-  gap: 24px;
+  gap: 10px;
   margin-top: 2px;
 }
 
@@ -616,7 +976,7 @@
 .endShiftContent {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 14px;
 }
 
 .endShiftContent > p {
@@ -628,7 +988,7 @@
 .endShiftOption {
   display: flex;
   align-items: flex-start;
-  gap: 24px;
+  gap: 10px;
   padding: 12px 13px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border);
@@ -671,7 +1031,6 @@
 
 /* ═══════════════════════════════════════════════════════════════════
    On-shift card: equipment row + history button
-   (previously referenced in JSX but missing from this stylesheet)
    ═══════════════════════════════════════════════════════════════════ */
 
 .equipmentRow {
@@ -749,7 +1108,7 @@
 .trailerGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
-  gap: 24px;
+  gap: 10px;
   max-height: 220px;
   overflow-y: auto;
   padding: 2px;
@@ -798,7 +1157,7 @@
 .formSection {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 14px;
 }
 
 .sectionLabel {
@@ -811,7 +1170,7 @@
 
 .formRow {
   display: flex;
-  gap: 24px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
@@ -863,7 +1222,7 @@
 .checkboxLabel {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 8px;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
@@ -881,7 +1240,7 @@
 .swapContent {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
 }
 
 .currentEquipment {
@@ -900,7 +1259,7 @@
 .swapCurrentChip {
   display: inline-flex;
   align-items: center;
-  gap: 24px;
+  gap: 6px;
   padding: 7px 12px;
   border-radius: 8px;
   background: rgba(0, 212, 255, 0.09);
@@ -921,7 +1280,7 @@
 .historyContent {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
 }
 
 .historyRangeToggle {
@@ -963,7 +1322,7 @@
 .historySummary {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
+  gap: 10px;
 }
 
 .historyStat {
@@ -996,7 +1355,7 @@
 .historyList {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 10px;
   max-height: 460px;
   overflow-y: auto;
 }
@@ -1013,7 +1372,7 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
-  gap: 24px;
+  gap: 8px;
 }
 
 .historyItemAction {

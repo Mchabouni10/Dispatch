@@ -1,13 +1,33 @@
-/* frontend/src/views/Imports/ImportsView.module.css */
-.page { max-width: 1240px; padding: 20px 24px 28px; }
-.header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
-.pageTitle { display: flex; align-items: center; gap: 10px; font-size: 26px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.5px; }
-.titleIcon { color: var(--success); }
-.pageSub { color: var(--text-secondary); font-size: 13px; margin-top: 4px; }
-.addBtn { display: flex; align-items: center; gap: 24px; padding: 12px 24px; background: linear-gradient(135deg, var(--success), #00a868); color: white; border: none; border-radius: var(--radius-md); font-size: 13.5px; font-weight: 600; transition: var(--transition); box-shadow: 0 4px 12px rgba(0,208,132,0.25); cursor: pointer; }
-.addBtn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,208,132,0.35); }
+/* frontend/src/views/Imports/ImportsView.module.css — page-specific styles only.
+   Shared UI (buttons, cards, forms, search, filters) composed from
+   shared.module.css for consistency across the app. Adjust the import path
+   below if your folder structure differs. */
 
-/* ── Stat bar ── */
+.page {
+  composes: page from '../../styles/shared.module.css';
+  max-width: 1240px; /* Imports needs extra room for the stat bar */
+}
+.header { composes: header from '../../styles/shared.module.css'; }
+
+.pageTitle {
+  composes: pageTitle from '../../styles/shared.module.css';
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.titleIcon { color: var(--success); }
+.pageSub { composes: pageSub from '../../styles/shared.module.css'; }
+
+.addBtn {
+  composes: addBtn from '../../styles/shared.module.css';
+  background: linear-gradient(135deg, var(--success), #00a868);
+  box-shadow: 0 4px 12px rgba(0, 208, 132, 0.25);
+}
+.addBtn:hover {
+  box-shadow: 0 6px 20px rgba(0, 208, 132, 0.35);
+}
+
+/* ── Stat bar — Imports-only, no shared equivalent ── */
 .statBar { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 24px; margin-bottom: 24px; }
 .statCard {
   display: flex; align-items: center; gap: 13px; padding: 20px 24px;
@@ -34,27 +54,25 @@
 .statGdp svg { color: var(--accent-cyan); }
 
 .toolbar { display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap; align-items: center; }
-.searchWrap { position: relative; flex: 1; min-width: 220px; max-width: 360px; }
-.searchIcon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px; pointer-events: none; }
-.searchInput { width: 100%; padding: 10px 14px 10px 36px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary); font-size: 13.5px; transition: var(--transition); }
-.searchInput:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,142,247,0.1); }
-.searchInput::placeholder { color: var(--text-muted); }
-.filterSelect { padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary); font-size: 13px; transition: var(--transition); cursor: pointer; }
-.filterSelect:focus { outline: none; border-color: var(--accent); }
-.filterSelect option { background: #111c33; }
+.searchWrap { composes: searchWrap from '../../styles/shared.module.css'; }
+.searchIcon { composes: searchIcon from '../../styles/shared.module.css'; }
+.searchInput { composes: searchInput from '../../styles/shared.module.css'; }
+.filterSelect { composes: filterSelect from '../../styles/shared.module.css'; }
+.filterSelect option { background: var(--select-option-bg); color: var(--select-option-color); }
 
 .groupToggle {
-  display: flex; align-items: center; gap: 24px; padding: 12px 20px;
+  display: flex; align-items: center; gap: 8px; padding: 12px 20px;
   background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md);
   color: var(--text-secondary); font-size: 12.5px; font-weight: 600; margin-left: auto; transition: var(--transition); cursor: pointer;
 }
 .groupToggle:hover { border-color: var(--border-hover); color: var(--text-primary); }
 .groupToggleActive { border-color: var(--accent-cyan); background: rgba(0,212,255,0.08); color: var(--accent-cyan); }
 
-.errorBanner { background: var(--danger-bg); border: 1px solid rgba(255,71,87,0.3); color: var(--danger); padding: 20px 24px; border-radius: var(--radius-md); font-size: 13px; margin-bottom: 24px; }
-.loading, .empty { text-align: center; padding: 60px; color: var(--text-secondary); font-size: 14px; }
+.errorBanner { composes: errorBanner from '../../styles/shared.module.css'; }
+.loading { composes: loading from '../../styles/shared.module.css'; }
+.empty { composes: empty from '../../styles/shared.module.css'; }
 
-/* ── Airline grouping ── */
+/* ── Airline grouping — Imports-only ── */
 .airlineGroup { margin-bottom: 28px; }
 .groupHeading {
   display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-bottom: 8px;
@@ -65,17 +83,22 @@
 .groupCode { font-size: 11px; font-weight: 700; color: var(--airline-color, var(--accent)); background: color-mix(in srgb, var(--airline-color, var(--accent)) 15%, transparent); padding: 3px 8px; border-radius: 100px; }
 .groupCount { margin-left: auto; color: var(--text-secondary); font-size: 12px; }
 
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+.grid {
+  composes: grid from '../../styles/shared.module.css';
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+}
 
 /* ── Card styles ── */
 .card {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
-  overflow: hidden; transition: var(--transition); border-left: 3px solid var(--airline-color, var(--border));
+  composes: card from '../../styles/shared.module.css';
+  border-left: 3px solid var(--airline-color, var(--border));
 }
-.card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--border-hover); border-left-color: var(--airline-color, var(--border-hover)); }
+.card:hover {
+  border-left-color: var(--airline-color, var(--border-hover));
+}
 .overdueCard { border-color: rgba(255,71,87,0.4); border-left-color: var(--danger); box-shadow: 0 0 20px rgba(255,71,87,0.1); }
 
-.overdueAlert { background: var(--danger-bg); border-bottom: 1px solid rgba(255,71,87,0.2); color: var(--danger); padding: 8px 16px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 24px; }
+.overdueAlert { background: var(--danger-bg); border-bottom: 1px solid rgba(255,71,87,0.2); color: var(--danger); padding: 8px 16px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
 .paidBadge { background: var(--success); color: white; padding: 2px 8px; border-radius: 100px; font-size: 10px; margin-left: auto; }
 
 .cardHeader { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
@@ -83,10 +106,17 @@
 .awbLabel { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
 .awbNum { font-size: 18px; font-weight: 800; color: var(--accent-cyan); font-family: monospace; letter-spacing: 1px; }
 
-.cardActions { display: flex; gap: 6px; }
-.editBtn, .deleteBtn { width: 30px; height: 30px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 12px; transition: var(--transition); background: var(--bg-card); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; }
-.editBtn:hover { background: var(--info-bg); border-color: var(--accent); color: var(--accent); }
-.deleteBtn:hover { background: var(--danger-bg); border-color: var(--danger); color: var(--danger); }
+.cardActions { composes: cardActions from '../../styles/shared.module.css'; }
+.editBtn { composes: editBtn from '../../styles/shared.module.css'; }
+.deleteBtn { composes: deleteBtn from '../../styles/shared.module.css'; }
+.printBtn {
+  composes: editBtn from '../../styles/shared.module.css';
+  color: var(--accent-cyan);
+}
+.printBtn:hover {
+  color: var(--accent-cyan);
+  background: rgba(0, 212, 255, 0.12);
+}
 
 .cardBody { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -103,7 +133,7 @@
 
 .airlinePip { width: 7px; height: 7px; border-radius: 50%; background: var(--airline-color, var(--accent)); flex: 0 0 auto; }
 
-.lfdRow { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm); font-size: 12px; color: var(--text-secondary); gap: 24px; }
+.lfdRow { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm); font-size: 12px; color: var(--text-secondary); gap: 10px; }
 .lfdRow strong { color: var(--text-primary); }
 .lfdRow svg { color: var(--text-muted); }
 .lfdOverdue { background: var(--danger-bg); color: var(--danger); }
@@ -115,59 +145,65 @@
 .feeBadge { background: rgba(255,71,87,0.2); color: var(--danger); padding: 2px 8px; border-radius: 100px; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .dueSoonBadge { background: var(--warning-bg); color: var(--warning); padding: 2px 8px; border-radius: 100px; font-size: 11px; font-weight: 700; white-space: nowrap; }
 
-.feeRow { display: flex; gap: 24px; flex-wrap: wrap; padding: 4px 0; }
+.feeRow { display: flex; gap: 10px; flex-wrap: wrap; padding: 4px 0; }
 .paidFee { color: var(--success); font-size: 12px; font-weight: 600; }
 .unpaidFee { color: var(--warning); font-size: 12px; font-weight: 600; }
 
 .gdpBadge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.2); border-radius: 100px; color: var(--accent-cyan); font-size: 12px; font-weight: 600; width: fit-content; }
 
-.notes { font-size: 12px; color: var(--text-muted); font-style: italic; margin: 0; }
+.notes { composes: notes from '../../styles/shared.module.css'; }
 
 /* ── Form styles ── */
-.form { display: flex; flex-direction: column; }
+.form { composes: form from '../../styles/shared.module.css'; }
 .formSectionLabel { font-size: 11px; font-weight: 800; color: var(--accent-cyan); text-transform: uppercase; letter-spacing: 0.6px; margin: 4px 0 10px; }
 .formSectionLabel:first-of-type { margin-top: 0; }
-.formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
-.formGroup { display: flex; flex-direction: column; gap: 6px; }
-.formGroup.fullWidth { grid-column: 1 / -1; }
+.formGrid { composes: formGrid from '../../styles/shared.module.css'; }
+.formGroup { composes: formGroup from '../../styles/shared.module.css'; }
+.fullWidth { composes: fullWidth from '../../styles/shared.module.css'; }
 
-.label { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; }
-.input { padding: 10px 14px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary); font-size: 13.5px; transition: var(--transition); width: 100%; }
-.input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,142,247,0.1); }
-.input::placeholder { color: var(--text-muted); }
+.label { composes: label from '../../styles/shared.module.css'; }
+.input { composes: input from '../../styles/shared.module.css'; }
 select.input { appearance: auto; }
-select.input option { background: #111c33; }
+select.input option { background: var(--select-option-bg); color: var(--select-option-color); }
 
-.weightInput { display: flex; gap: 24px; width: 100%; }
+.weightInput { display: flex; gap: 10px; width: 100%; }
 .weightInput .input { flex: 1; }
 .weightUnitSelect { padding: 10px 8px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary); font-size: 13px; min-width: 60px; cursor: pointer; }
 
-.checkboxLabel { display: flex; align-items: center; gap: 24px; font-size: 13px; color: var(--text-primary); cursor: pointer; }
-.checkboxLabel input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent-cyan); }
+.checkboxLabel {
+  composes: checkboxLabel from '../../styles/shared.module.css';
+}
+.checkboxLabel input[type="checkbox"] {
+  accent-color: var(--accent-cyan);
+}
 
 .hint { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
 
-.formError { background: var(--danger-bg); border: 1px solid rgba(255,71,87,0.3); color: var(--danger); padding: 10px 14px; border-radius: var(--radius-md); font-size: 13px; margin-bottom: 24px; }
-.formActions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
-.cancelBtn { padding: 12px 24px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-secondary); font-size: 13.5px; font-weight: 500; transition: var(--transition); cursor: pointer; }
-.cancelBtn:hover { background: var(--bg-card-hover); color: var(--text-primary); }
-.saveBtn { padding: 10px 24px; background: linear-gradient(135deg, var(--success), #00a868); color: white; border: none; border-radius: var(--radius-md); font-size: 13.5px; font-weight: 600; transition: var(--transition); cursor: pointer; box-shadow: 0 4px 12px rgba(0,208,132,0.25); }
-.saveBtn:hover:not(:disabled) { transform: translateY(-1px); }
-.saveBtn:disabled { opacity: 0.6; cursor: not-allowed; }
-.deleteConfirmBtn { padding: 10px 24px; background: linear-gradient(135deg, var(--danger), #cc2233); color: white; border: none; border-radius: var(--radius-md); font-size: 13.5px; font-weight: 600; transition: var(--transition); cursor: pointer; }
-.deleteConfirmBtn:hover { transform: translateY(-1px); }
-.confirmText { color: var(--text-secondary); font-size: 14px; margin-bottom: 24px; line-height: 1.6; }
+.formError { composes: formError from '../../styles/shared.module.css'; }
+.formActions { composes: formActions from '../../styles/shared.module.css'; }
+.cancelBtn { composes: cancelBtn from '../../styles/shared.module.css'; }
+.saveBtn {
+  composes: saveBtn from '../../styles/shared.module.css';
+  background: linear-gradient(135deg, var(--success), #00a868);
+  box-shadow: 0 4px 12px rgba(0, 208, 132, 0.25);
+}
+.deleteConfirmBtn { composes: deleteConfirmBtn from '../../styles/shared.module.css'; }
+.confirmText { composes: confirmText from '../../styles/shared.module.css'; }
 
-/* ── Responsive ── */
+/* ── Responsive — only what's unique to Imports; shared handles header/formGrid/grid at 768px ── */
 @media (max-width: 900px) {
   .statBar { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 640px) {
   .statBar { grid-template-columns: 1fr; }
-  .formGrid { grid-template-columns: 1fr; }
   .groupToggle { margin-left: 0; }
-  .header { flex-direction: column; align-items: stretch; }
   .addBtn { width: 100%; justify-content: center; }
 }
+
+
+
+
+
+
 
 

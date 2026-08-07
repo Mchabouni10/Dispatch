@@ -1,67 +1,15 @@
-/* AirlinesView – Table View Styles */
+/* AirlinesView.table.module.css — page-specific table extras only.
+   Shared table shell / actions / view-toggle composed from shared.module.css
+   for consistency across the app. Adjust the import path below if your
+   folder structure differs. */
 
-.tableWrap {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  box-shadow: var(--shadow-sm, 0 2px 8px rgba(0,0,0,0.15));
-}
-
-.tableScroll {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  min-width: 860px;
-}
-
-.table thead {
-  background: rgba(255,255,255,0.03);
-  border-bottom: 1px solid var(--border);
-}
-
-.table th {
-  padding: 14px 18px;
-  text-align: left;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-  user-select: none;
-}
-
-.table th:first-child { padding-left: 18px; }
-.table th:last-child  { padding-right: 18px; text-align: right; }
-
-.table tbody tr {
-  border-bottom: 1px solid var(--border);
-  transition: background 0.15s ease;
-}
-
-.table tbody tr:last-child { border-bottom: none; }
-
-.table tbody tr:hover {
-  background: rgba(255,255,255,0.035);
-}
-
-.table td {
-  padding: 14px 18px;
-  vertical-align: middle;
-  color: var(--text-primary);
-}
-
-.table td:first-child { padding-left: 18px; }
-.table td:last-child  { padding-right: 18px; }
+.tableWrap { composes: tableWrap from '../../styles/shared.module.css'; }
+.tableScroll { composes: tableScroll from '../../styles/shared.module.css'; }
+.table { composes: table from '../../styles/shared.module.css'; }
 
 .colLogo { width: 52px; }
 
+/* Airlines-only data cells — no shared equivalent */
 .logoCell {
   width: 38px;
   height: 38px;
@@ -200,106 +148,15 @@
   white-space: nowrap;
 }
 
-.actions {
-  display: flex;
-  gap: 6px;
-  justify-content: flex-end;
-}
+.actions { composes: actions from '../../styles/shared.module.css'; }
+.actionBtn { composes: actionBtn from '../../styles/shared.module.css'; }
+.editBtn { composes: actionEdit from '../../styles/shared.module.css'; }
+.deleteBtn { composes: actionDelete from '../../styles/shared.module.css'; }
 
-.actionBtn {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-sm, 6px);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  transition: var(--transition, all 0.15s ease);
-  border: 1px solid transparent;
-  cursor: pointer;
-  background: transparent;
-}
-
-.editBtn {
-  background: var(--info-bg);
-  border-color: rgba(79,142,247,0.3);
-  color: var(--accent);
-}
-
-.editBtn:hover {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(79,142,247,0.35);
-}
-
-.deleteBtn {
-  background: var(--danger-bg);
-  border-color: rgba(255,71,87,0.3);
-  color: var(--danger);
-}
-
-.deleteBtn:hover {
-  background: var(--danger);
-  border-color: var(--danger);
-  color: #fff;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255,71,87,0.35);
-}
-
-.emptyRow td {
-  text-align: center;
-  padding: 48px 16px;
-  color: var(--text-secondary);
-  font-size: 13.5px;
-}
+.emptyRow { composes: emptyRow from '../../styles/shared.module.css'; }
 
 /* View Toggle */
-.viewToggle {
-  display: inline-flex;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 3px;
-  gap: 2px;
-}
-
-.toggleBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 7px 12px;
-  border-radius: calc(var(--radius-md) - 2px);
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-
-.toggleBtn:hover {
-  color: var(--text-primary);
-  background: rgba(255,255,255,0.05);
-}
-
-.toggleBtnActive {
-  background: var(--accent);
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(79,142,247,0.35);
-}
-
-.toggleBtnActive:hover {
-  background: var(--accent);
-  color: #fff;
-}
-
-@media (max-width: 720px) {
-  .viewToggle .toggleLabel { display: none; }
-  .toggleBtn { padding: 7px 10px; }
-}
-
+.viewToggle { composes: viewToggle from '../../styles/shared.module.css'; }
+.toggleBtn { composes: toggleBtn from '../../styles/shared.module.css'; }
+.toggleBtnActive { composes: toggleBtnActive from '../../styles/shared.module.css'; }
+.toggleLabel { composes: toggleLabel from '../../styles/shared.module.css'; }

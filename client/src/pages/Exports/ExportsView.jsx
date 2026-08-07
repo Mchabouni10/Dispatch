@@ -12,6 +12,7 @@ import {
 import { getShipments, createShipment, updateShipment, deleteShipment, getAirlines, getWarehouses } from '../../api/api.js';
 import Modal from '../../components/Modal/Modal.jsx';
 import StatusBadge from '../../components/StatusBadge/StatusBadge.jsx';
+import DateTimePicker, { toLocalISO } from '../../styles/Datetimepicker.jsx';
 import styles from '../Imports/ImportsView.module.css';
 import tableStyles from './ExportsView.table.module.css';
 
@@ -552,19 +553,25 @@ export default function ExportsView() {
           <div className={styles.formGrid}>
             <div className={styles.formGroup}>
               <label className={styles.label}>Flight Departure *</label>
-              <input className={styles.input} type="datetime-local" required value={form.flightDate} 
-                onChange={e => setForm(f => ({ ...f, flightDate: e.target.value }))} />
+              <DateTimePicker
+                value={form.flightDate}
+                onChange={(date) => setForm((f) => ({ ...f, flightDate: date ? toLocalISO(date) : '' }))}
+              />
               <small className={styles.hint}>Cutoff time will be calculated automatically</small>
             </div>
             <div className={styles.formGroup}>
               <label className={styles.label}>Cargo Ready at Warehouse</label>
-              <input className={styles.input} type="datetime-local" value={form.pickupReadyAt} 
-                onChange={e => setForm(f => ({ ...f, pickupReadyAt: e.target.value }))} />
+              <DateTimePicker
+                value={form.pickupReadyAt}
+                onChange={(date) => setForm((f) => ({ ...f, pickupReadyAt: date ? toLocalISO(date) : '' }))}
+              />
             </div>
             <div className={styles.formGroup}>
               <label className={styles.label}>Airline Terminal Appointment</label>
-              <input className={styles.input} type="datetime-local" value={form.deliveryAppointmentAt} 
-                onChange={e => setForm(f => ({ ...f, deliveryAppointmentAt: e.target.value }))} />
+              <DateTimePicker
+                value={form.deliveryAppointmentAt}
+                onChange={(date) => setForm((f) => ({ ...f, deliveryAppointmentAt: date ? toLocalISO(date) : '' }))}
+              />
             </div>
           </div>
 

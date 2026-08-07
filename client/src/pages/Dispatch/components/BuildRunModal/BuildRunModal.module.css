@@ -1,0 +1,157 @@
+/* ── Run type picker ── */
+
+.runTypePicker {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.runTypeBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-secondary);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.runTypeBtn span {
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
+.runTypeBtnActive {
+  border-color: var(--accent-cyan);
+  background: rgba(0, 212, 255, 0.08);
+  color: var(--accent-cyan);
+}
+
+.runTypeBtnActive span {
+  color: var(--accent-cyan);
+}
+
+.runTypeBtnExport {
+  border-color: #b98cff;
+  background: var(--purple-bg);
+  color: #d6b7ff;
+}
+
+.runTypeBtnExport span {
+  color: #d6b7ff;
+}
+
+/* ── Route banner ── */
+
+.routeBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 14px 18px;
+  background: linear-gradient(
+    135deg,
+    rgba(0, 212, 255, 0.1) 0%,
+    var(--bg-card) 100%
+  );
+  border: 1px solid rgba(0, 212, 255, 0.22);
+  border-radius: 12px;
+  margin-bottom: 24px;
+}
+
+.routeStep {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.routeBadge {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--accent-cyan);
+}
+
+.routeInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.routeInfo svg {
+  color: var(--accent-cyan);
+}
+
+.routeArrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.routeTruckTag {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 212, 255, 0.12);
+  padding: 2px 8px;
+  border-radius: 100px;
+}
+
+/* ── Airline suggestion ── */
+
+.airlineSuggestionBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 15px;
+  background: rgba(0, 208, 132, 0.1);
+  border: 1px solid rgba(0, 208, 132, 0.3);
+  border-radius: 10px;
+  color: var(--success);
+  font-size: 13px;
+  margin-bottom: 24px;
+}
+
+.airlineSuggestionBanner svg {
+  font-size: 18px;
+}
+
+.airlineSuggestionBanner div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.airlineSuggestionBanner strong {
+  font-weight: 700;
+}
+
+.airlineSuggestionBanner span {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+@media (max-width: 700px) {
+  .routeBanner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

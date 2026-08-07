@@ -637,7 +637,7 @@
 .textarea { resize: vertical; min-height: 80px; }
 
 select.input { cursor: pointer; }
-select.input option { background: #111c33; }
+select.input option { background: var(--select-option-bg); color: var(--select-option-color); }
 
 .input[multiple] {
   min-height: 80px;
@@ -832,5 +832,141 @@ small {
   
   .fullWidth {
     grid-column: 1;
+  }
+}
+/* ===== Compliance alerts banner (expired/expiring license & DOT card) ===== */
+.alertsBanner {
+  border-radius: var(--radius-md);
+  border: 1px solid;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.alertsBannerDanger {
+  background: var(--danger-bg);
+  border-color: rgba(255, 71, 87, 0.3);
+}
+
+.alertsBannerWarning {
+  background: rgba(255, 193, 7, 0.1);
+  border-color: rgba(255, 193, 7, 0.3);
+}
+
+.alertsBannerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px 6px 18px;
+}
+
+.alertsBannerTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  padding: 8px 0;
+  font-size: 13.5px;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.alertsBannerDanger .alertsBannerTitle svg:first-child { color: var(--danger); }
+.alertsBannerWarning .alertsBannerTitle svg:first-child { color: var(--warning); }
+
+.alertsBannerSub {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.alertsChevron {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 12px;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.alertsChevronOpen { transform: rotate(180deg); }
+
+.alertsDismissBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: var(--transition);
+}
+
+.alertsDismissBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.alertsList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 18px 14px;
+}
+
+.alertItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 9px 12px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: var(--transition);
+}
+
+.alertItem:hover { border-color: var(--accent); }
+
+.alertItemExpired svg { color: var(--danger); }
+.alertItemWarning svg { color: var(--warning); }
+
+.alertItemName {
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.alertItemLabel {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.alertItemDetail {
+  margin-left: auto;
+  font-size: 12.5px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.alertItemExpired .alertItemDetail { color: var(--danger); }
+.alertItemWarning .alertItemDetail { color: var(--warning); }
+
+@media (max-width: 640px) {
+  .alertItem {
+    flex-wrap: wrap;
+  }
+  .alertItemDetail {
+    margin-left: 0;
+    width: 100%;
   }
 }

@@ -1,80 +1,26 @@
-/* WarehousesView — cards, form, page shell */
+/* WarehousesView.module.css — page-specific styles only.
+   Shared UI (buttons, cards, forms, day pickers) composed from shared.module.css
+   for consistency across the app. Adjust the import path below if your folder
+   structure differs. */
 
-.page { max-width: 1200px; padding: 20px 24px 28px; }
-.header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 16px;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-.pageTitle {
-  font-size: 26px;
-  font-weight: 800;
-  color: var(--text-primary);
-  letter-spacing: -0.5px;
-}
-.pageSub {
-  color: var(--text-secondary);
-  font-size: 13px;
-  margin-top: 4px;
-}
-.addBtn {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  padding: 12px 24px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-  color: white;
-  border: none;
-  border-radius: var(--radius-md);
-  font-size: 13.5px;
-  font-weight: 600;
-  transition: var(--transition);
-  box-shadow: 0 4px 12px rgba(79,142,247,0.3);
-  cursor: pointer;
-}
-.addBtn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(79,142,247,0.4);
-}
+.page { composes: page from '../../styles/shared.module.css'; }
+.header { composes: header from '../../styles/shared.module.css'; }
+.pageTitle { composes: pageTitle from '../../styles/shared.module.css'; }
+.pageSub { composes: pageSub from '../../styles/shared.module.css'; }
+.addBtn { composes: addBtn from '../../styles/shared.module.css'; }
 
-.errorBanner {
-  background: var(--danger-bg);
-  border: 1px solid rgba(255,71,87,0.3);
-  color: var(--danger);
-  padding: 20px 24px;
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  margin-bottom: 24px;
-}
-.loading, .empty {
-  text-align: center;
-  padding: 60px;
-  color: var(--text-secondary);
-  font-size: 14px;
-}
+.errorBanner { composes: errorBanner from '../../styles/shared.module.css'; }
+.loading { composes: loading from '../../styles/shared.module.css'; }
+.empty { composes: empty from '../../styles/shared.module.css'; }
 
 /* ── Card grid ── */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 14px;
-}
+.grid { composes: grid from '../../styles/shared.module.css'; }
 
 .card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  transition: var(--transition);
+  composes: card from '../../styles/shared.module.css';
   border-left: 3px solid var(--accent);
 }
 .card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 28px rgba(0,0,0,0.2);
-  border-color: var(--border-hover);
   border-left-color: var(--accent-cyan);
 }
 
@@ -99,10 +45,11 @@
   font-weight: 800;
   flex-shrink: 0;
   letter-spacing: 0.5px;
-  border: 1px solid rgba(79,142,247,0.2);
+  border: 1px solid rgba(79, 142, 247, 0.2);
 }
 
 .whInfo { flex: 1; min-width: 0; }
+
 .whName {
   font-size: 14.5px;
   font-weight: 700;
@@ -110,50 +57,30 @@
   margin-bottom: 4px;
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 8px;
   flex-wrap: wrap;
 }
+
 .whHours {
   font-size: 12px;
   color: var(--text-secondary);
 }
 
-.cardActions { display: flex; gap: 6px; flex-shrink: 0; }
-.editBtn, .deleteBtn {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  transition: var(--transition);
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-.editBtn:hover {
-  background: var(--info-bg);
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.deleteBtn:hover {
-  background: var(--danger-bg);
-  border-color: var(--danger);
-  color: var(--danger);
-}
+.cardActions { composes: cardActions from '../../styles/shared.module.css'; }
+.editBtn { composes: editBtn from '../../styles/shared.module.css'; }
+.deleteBtn { composes: deleteBtn from '../../styles/shared.module.css'; }
 
 .cardBody {
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 10px;
 }
+
 .infoRow {
   display: flex;
   align-items: flex-start;
-  gap: 24px;
+  gap: 8px;
   font-size: 12.5px;
   color: var(--text-secondary);
 }
@@ -163,17 +90,14 @@
   flex-shrink: 0;
   margin-top: 2px;
 }
-.notes {
-  font-size: 12px;
-  color: var(--text-muted);
-  font-style: italic;
-  margin: 0;
-}
 
+.notes { composes: notes from '../../styles/shared.module.css'; }
+
+/* Warehouse-only 24/7 badge — no exact equivalent in shared */
 .badge24 {
   display: inline-block;
   padding: 2px 7px;
-  background: rgba(46,204,113,0.14);
+  background: rgba(46, 204, 113, 0.14);
   color: var(--success);
   border-radius: 999px;
   font-size: 9.5px;
@@ -183,104 +107,21 @@
 }
 
 /* ── Form ── */
-.form { display: flex; flex-direction: column; }
-.formGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  margin-bottom: 24px;
-}
-.fullWidth { grid-column: 1 / -1; }
-.formGroup { display: flex; flex-direction: column; gap: 6px; }
-.label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-.input, .textarea {
-  padding: 10px 14px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  color: var(--text-primary);
-  font-size: 13.5px;
-  transition: var(--transition);
-  width: 100%;
-}
-.input:focus, .textarea:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(79,142,247,0.1);
-}
-.input::placeholder, .textarea::placeholder { color: var(--text-muted); }
-.textarea { resize: vertical; min-height: 80px; }
+.form { composes: form from '../../styles/shared.module.css'; }
+.formGrid { composes: formGrid from '../../styles/shared.module.css'; }
+.fullWidth { composes: fullWidth from '../../styles/shared.module.css'; }
+.formGroup { composes: formGroup from '../../styles/shared.module.css'; }
+.label { composes: label from '../../styles/shared.module.css'; }
+.input { composes: input from '../../styles/shared.module.css'; }
+.textarea { composes: textarea from '../../styles/shared.module.css'; }
+.formError { composes: formError from '../../styles/shared.module.css'; }
+.formActions { composes: formActions from '../../styles/shared.module.css'; }
+.cancelBtn { composes: cancelBtn from '../../styles/shared.module.css'; }
+.saveBtn { composes: saveBtn from '../../styles/shared.module.css'; }
+.deleteConfirmBtn { composes: deleteConfirmBtn from '../../styles/shared.module.css'; }
+.confirmText { composes: confirmText from '../../styles/shared.module.css'; }
 
-.formError {
-  background: var(--danger-bg);
-  border: 1px solid rgba(255,71,87,0.3);
-  color: var(--danger);
-  padding: 10px 14px;
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  margin-bottom: 24px;
-}
-.formActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 4px;
-}
-.cancelBtn {
-  padding: 12px 24px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
-  font-size: 13.5px;
-  font-weight: 500;
-  transition: var(--transition);
-  cursor: pointer;
-}
-.cancelBtn:hover {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
-}
-.saveBtn {
-  padding: 10px 24px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-  color: white;
-  border: none;
-  border-radius: var(--radius-md);
-  font-size: 13.5px;
-  font-weight: 600;
-  transition: var(--transition);
-  box-shadow: 0 4px 12px rgba(79,142,247,0.3);
-  cursor: pointer;
-}
-.saveBtn:hover:not(:disabled) { transform: translateY(-1px); }
-.saveBtn:disabled { opacity: 0.6; cursor: not-allowed; }
-.deleteConfirmBtn {
-  padding: 10px 24px;
-  background: linear-gradient(135deg, var(--danger), #cc2233);
-  color: white;
-  border: none;
-  border-radius: var(--radius-md);
-  font-size: 13.5px;
-  font-weight: 600;
-  transition: var(--transition);
-  cursor: pointer;
-}
-.deleteConfirmBtn:hover { transform: translateY(-1px); }
-.confirmText {
-  color: var(--text-secondary);
-  font-size: 14px;
-  margin-bottom: 24px;
-  line-height: 1.6;
-}
-
-/* Operating hours */
+/* ── Operating hours — 24h toggle switch is Warehouse-specific ── */
 .toggleRow {
   display: flex;
   align-items: center;
@@ -322,47 +163,15 @@
 }
 
 .dayPicker { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
-.dayPills { display: flex; gap: 6px; }
-.dayPill {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: var(--transition);
-  cursor: pointer;
-}
-.dayPill:hover { border-color: var(--border-hover); color: var(--text-primary); }
-.dayPillActive {
-  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-  border-color: var(--accent);
-  color: white;
-}
-.dayPresets { display: flex; gap: 24px; flex-wrap: wrap; }
-.presetBtn {
-  padding: 5px 12px;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--text-secondary);
-  font-size: 11.5px;
-  font-weight: 500;
-  transition: var(--transition);
-  cursor: pointer;
-}
-.presetBtn:hover { border-color: var(--accent); color: var(--accent); }
+.dayPills { composes: dayPills from '../../styles/shared.module.css'; }
+.dayPill { composes: dayPill from '../../styles/shared.module.css'; }
+.dayPillActive { composes: dayPillActive from '../../styles/shared.module.css'; }
+.dayPresets { composes: dayPresets from '../../styles/shared.module.css'; }
+.presetBtn { composes: presetBtn from '../../styles/shared.module.css'; }
 
-.timeRow { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.timeRow { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
 @media (max-width: 640px) {
-  .formGrid { grid-template-columns: 1fr; }
-  .header { flex-direction: column; align-items: stretch; }
   .addBtn { width: 100%; justify-content: center; }
+  .timeRow { grid-template-columns: 1fr; }
 }
-

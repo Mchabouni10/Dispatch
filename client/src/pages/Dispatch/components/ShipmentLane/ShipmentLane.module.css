@@ -1,0 +1,45 @@
+.lane {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-top: 10px;
+}
+
+.laneCompact {
+  margin-top: 7px;
+}
+
+.lanePoint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #b9c8df;
+}
+
+.lanePoint svg {
+  color: var(--accent-cyan);
+}
+
+.laneLine {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.cutoff {
+  margin-left: auto;
+  color: var(--accent-cyan);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.cutoffUrgent {
+  color: var(--warning);
+}
+
+@media (max-width: 700px) {
+  .laneLine {
+    display: none;
+  }
+}

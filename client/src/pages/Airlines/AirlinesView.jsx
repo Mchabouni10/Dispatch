@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faPlus, faPencil, faTrash, faPlane, faClock, faTag,
   faDoorOpen, faDoorClosed, faInfinity, faImage,
-  faTable, faThLarge, faMapMarkerAlt
+  faTable, faThLarge, faMapMarkerAlt, faSearch, faXmark
 } from '@fortawesome/free-solid-svg-icons';
 import { getAirlines, createAirline, updateAirline, deleteAirline, uploadAirlineLogo, resolveUploadUrl } from '../../api/api.js';
 import Modal from '../../components/Modal/Modal.jsx';
+import TimePicker from '../../styles/TimePicker.jsx';
 import styles from './AirlinesView.module.css';
 import tableStyles from './AirlinesView.table.module.css';
 
@@ -50,6 +51,7 @@ export default function AirlinesView() {
   const [saving, setSaving] = useState(false);
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState('');
+  const [search, setSearch] = useState('');
 
   // View mode: 'cards' | 'table' (persisted)
   const [viewMode, setViewMode] = useState(() => {
@@ -77,6 +79,16 @@ export default function AirlinesView() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const filteredAirlines = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return airlines;
+    return airlines.filter(a =>
+      a.name?.toLowerCase().includes(q) ||
+      a.awbPrefix?.toLowerCase().includes(q) ||
+      a.code?.toLowerCase().includes(q)
+    );
+  }, [airlines, search]);
 
   const openAdd = () => {
     setEditing(null);
@@ -165,8 +177,12 @@ export default function AirlinesView() {
   /* ── Card view – address always visible under name ── */
   const renderCards = () => (
     <div className={styles.grid}>
-      {airlines.length === 0 && <div className={styles.empty}>No airlines yet. Add one!</div>}
-      {airlines.map(a => (
+      {filteredAirlines.length === 0 && (
+        <div className={styles.empty}>
+          {airlines.length === 0 ? 'No airlines yet. Add one!' : 'No airlines match your search.'}
+        </div>
+      )}
+      {filteredAirlines.map(a => (
         <div key={a.id} className={styles.card}>
           <div className={styles.cardTop}>
             {a.logoUrl ? (
@@ -243,12 +259,14 @@ export default function AirlinesView() {
             </tr>
           </thead>
           <tbody>
-            {airlines.length === 0 ? (
+            {filteredAirlines.length === 0 ? (
               <tr className={tableStyles.emptyRow}>
-                <td colSpan={8}>No airlines yet. Add one!</td>
+                <td colSpan={8}>
+                  {airlines.length === 0 ? 'No airlines yet. Add one!' : 'No airlines match your search.'}
+                </td>
               </tr>
             ) : (
-              airlines.map(a => (
+              filteredAirlines.map(a => (
                 <tr key={a.id}>
                   <td>
                     {a.logoUrl ? (
@@ -323,7 +341,11 @@ export default function AirlinesView() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.pageTitle}>Airlines</h1>
-          <p className={styles.pageSub}>{airlines.length} airline cargo stations</p>
+          <p className={styles.pageSub}>
+            {search.trim()
+              ? `${filteredAirlines.length} of ${airlines.length} airline cargo stations`
+              : `${airlines.length} airline cargo stations`}
+          </p>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -353,6 +375,29 @@ export default function AirlinesView() {
           <button className={styles.addBtn} onClick={openAdd} id="add-airline-btn">
             <FontAwesomeIcon icon={faPlus} /> Add Airline
           </button>
+        </div>
+      </div>
+
+      <div className={styles.toolbar}>
+        <div className={styles.searchWrap}>
+          <FontAwesomeIcon icon={faSearch} className={styles.searchIcon} />
+          <input
+            type="text"
+            className={styles.searchInput}
+            placeholder="Search by name or AWB prefix…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {search && (
+            <button
+              type="button"
+              className={styles.searchClear}
+              onClick={() => setSearch('')}
+              aria-label="Clear search"
+            >
+              <FontAwesomeIcon icon={faXmark} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -387,11 +432,21 @@ export default function AirlinesView() {
             </div>
             <div className={styles.formGroup}>
               <label className={styles.label}>Opens *</label>
-              <input id="al-open-time" className={styles.input} type="time" required disabled={form.open24h} value={form.openTime} onChange={e => setForm(f => ({ ...f, openTime: e.target.value }))} />
+              <TimePicker
+                value={form.openTime || null}
+                onChange={(t) => setForm(f => ({ ...f, openTime: t || '' }))}
+                placeholder="Select open time"
+                disabled={form.open24h}
+              />
             </div>
             <div className={styles.formGroup}>
               <label className={styles.label}>Closes *</label>
-              <input id="al-close-time" className={styles.input} type="time" required disabled={form.open24h} value={form.closeTime} onChange={e => setForm(f => ({ ...f, closeTime: e.target.value }))} />
+              <TimePicker
+                value={form.closeTime || null}
+                onChange={(t) => setForm(f => ({ ...f, closeTime: t || '' }))}
+                placeholder="Select close time"
+                disabled={form.open24h}
+              />
             </div>
             <div className={`${styles.formGroup} ${styles.fullWidth}`}>
               <label className={styles.checkboxLabel}>
@@ -445,4 +500,6 @@ export default function AirlinesView() {
     </div>
   );
 }
+
+
 

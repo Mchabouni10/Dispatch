@@ -1,4 +1,3 @@
-// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -36,20 +35,20 @@ enum EquipmentHandoffReason {
 // MODEL: Airline
 // ============================================================
 model Airline {
-  id                  String   @id @default(cuid())
-  code                String   @unique
-  name                String
-  awbPrefix           String   @unique
-  logoUrl             String?  @db.VarChar(255)
-  terminalAddress     String?
-  contactPhone        String?  @db.VarChar(20)
-  openTime            String?  @db.VarChar(5)
-  closeTime           String?  @db.VarChar(5)
-  open24h             Boolean  @default(false)
-  defaultCutoffHours  Int      @default(4)
-  notes               String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  code               String   @unique
+  name               String
+  awbPrefix          String   @unique
+  logoUrl            String?  @db.VarChar(255)
+  terminalAddress    String?
+  contactPhone       String?  @db.VarChar(20)
+  openTime           String?  @db.VarChar(5)
+  closeTime          String?  @db.VarChar(5)
+  open24h            Boolean  @default(false)
+  defaultCutoffHours Int      @default(4)
+  notes              String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   shipments Shipment[]
 }
@@ -58,88 +57,87 @@ model Airline {
 // MODEL: Driver
 // ============================================================
 model Driver {
-  id                    String   @id @default(cuid())
-  name                  String
-  employeeId            String   @unique
-  phone                 String   @db.VarChar(20)
-  email                 String   @db.VarChar(100)
-  photo                 String?  @db.VarChar(255)
-  address               String?
-  dateOfBirth           DateTime?
-  gender                String?  @db.VarChar(10)
-  status                String   @default("Available")
-  statusReason          String?
-  leaveStart            DateTime?
-  leaveEnd              DateTime?
-  schedule              String   @db.VarChar(100)
-  shiftStart            String?  @db.VarChar(5)
-  shiftEnd              String?  @db.VarChar(5)
-  daysOff               String[]
-  availableOnDaysOff    Boolean  @default(false)
-  overtimePreference    Boolean  @default(false)
-  maxWeeklyHours        Int      @default(60)
-  licenseNumber         String?
-  licenseClass          String   @default("A") @db.VarChar(1)
-  licenseExpiration     DateTime?
-  licensePhoto          String?  @db.VarChar(255)
-  medicalCertExpiration DateTime?
-  endorsements          String[]
-  vehicleTypes          String[]
-  trailerEligible       Boolean  @default(true)
-  hazmatCertified       Boolean  @default(false)
-  gdpTrained            Boolean  @default(false)
-  currentLocation       String?  
-  currentLatitude       Float?
-  currentLongitude      Float?
-  lastCheckin           DateTime?
-  hoursDrivenToday      Float    @default(0)
-  onDutyHours           Float    @default(0)
-  lastBreakTime         DateTime?
-  breakUntil            DateTime?
-  shiftStartTime        DateTime?
-  shiftEndTime          DateTime?
-  preferredRunTypes     String[]
-  homeBase              String?  
-  maxRadius             Int?     
-  overnightAllowed      Boolean  @default(true)
-  crossBorder           Boolean  @default(false)
-  performanceRating     Float?   @default(3.0)
-  totalTripsCompleted   Int      @default(0)
-  onTimeDeliveryRate    Float?   @default(100.0)
-  safetyScore           Float?   @default(100.0)
-  incidents             Int      @default(0)
-  hireDate              DateTime?
-  employmentStatus      String   @default("Active")
-  payType               String   @default("Hourly")
-  payRate               Float    @default(0)
-  overtimeRate          Float?   
-  bonusEligible         Boolean  @default(false)
-  lastPayRaise          DateTime?
-  emergencyContactName  String?
-  emergencyContactPhone String?  @db.VarChar(20)
+  id                       String    @id @default(cuid())
+  name                     String
+  employeeId               String    @unique
+  phone                    String    @db.VarChar(20)
+  email                    String    @db.VarChar(100)
+  photo                    String?   @db.VarChar(255)
+  address                  String?
+  dateOfBirth              DateTime?
+  gender                   String?   @db.VarChar(10)
+  status                   String    @default("Available")
+  statusReason             String?
+  leaveStart               DateTime?
+  leaveEnd                 DateTime?
+  schedule                 String    @db.VarChar(100)
+  shiftStart               String?   @db.VarChar(5)
+  shiftEnd                 String?   @db.VarChar(5)
+  daysOff                  String[]
+  availableOnDaysOff       Boolean   @default(false)
+  overtimePreference       Boolean   @default(false)
+  maxWeeklyHours           Int       @default(60)
+  licenseNumber            String?
+  licenseClass             String    @default("A") @db.VarChar(1)
+  licenseExpiration        DateTime?
+  licensePhoto             String?   @db.VarChar(255)
+  medicalCertExpiration    DateTime?
+  endorsements             String[]
+  vehicleTypes             String[]
+  trailerEligible          Boolean   @default(true)
+  hazmatCertified          Boolean   @default(false)
+  gdpTrained               Boolean   @default(false)
+  currentLocation          String?
+  currentLatitude          Float?
+  currentLongitude         Float?
+  lastCheckin              DateTime?
+  hoursDrivenToday         Float     @default(0)
+  onDutyHours              Float     @default(0)
+  lastBreakTime            DateTime?
+  breakUntil               DateTime?
+  shiftStartTime           DateTime?
+  shiftEndTime             DateTime?
+  preferredRunTypes        String[]
+  homeBase                 String?
+  maxRadius                Int?
+  overnightAllowed         Boolean   @default(true)
+  crossBorder              Boolean   @default(false)
+  performanceRating        Float?    @default(3.0)
+  totalTripsCompleted      Int       @default(0)
+  onTimeDeliveryRate       Float?    @default(100.0)
+  safetyScore              Float?    @default(100.0)
+  incidents                Int       @default(0)
+  hireDate                 DateTime?
+  employmentStatus         String    @default("Active")
+  payType                  String    @default("Hourly")
+  payRate                  Float     @default(0)
+  overtimeRate             Float?
+  bonusEligible            Boolean   @default(false)
+  lastPayRaise             DateTime?
+  emergencyContactName     String?
+  emergencyContactPhone    String?   @db.VarChar(20)
   emergencyContactRelation String?
-  notes                 String?
-  specialSkills         String?
-  medicalConditions     String?  
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  notes                    String?
+  specialSkills            String?
+  medicalConditions        String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
-  // Relations
-  trips               Trip[]
-  assignedEquipment   Equipment[]
-  equipmentHandoffs   EquipmentHandoff[]                    // primary driver
-  handoffsAsApprover  EquipmentHandoff[] @relation("ApproverDriver")  // when this driver is the approver/dispatcher
+  trips              Trip[]
+  assignedEquipment  Equipment[]
+  equipmentHandoffs  EquipmentHandoff[]
+  handoffsAsApprover EquipmentHandoff[] @relation("ApproverDriver")
 }
 
 // ============================================================
 // MODEL: Equipment
 // ============================================================
 model Equipment {
-  id                     String   @id @default(cuid())
-  unitNumber             String   @unique
+  id                     String    @id @default(cuid())
+  unitNumber             String    @unique
   equipmentType          String
   category               String
-  status                 String   @default("In Service")
+  status                 String    @default("In Service")
   licensePlate           String?
   vin                    String?
   year                   Int?
@@ -154,121 +152,102 @@ model Equipment {
   insurancePolicyNumber  String?
   insuranceExpiration    DateTime?
   iftaIrpExpiration      DateTime?
-  ownershipType          String   @default("Owned")
+  ownershipType          String    @default("Owned")
   leaseCompany           String?
   leaseEndDate           DateTime?
   monthlyPaymentAmount   Float?
   assignedDriverId       String?
-  assignedDriver         Driver?  @relation(fields: [assignedDriverId], references: [id])
+  assignedDriver         Driver?   @relation(fields: [assignedDriverId], references: [id])
   availableAt            DateTime?
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
-  // Relations
-  tripsAsTruck    Trip[] @relation("TruckTrips")
-  tripsAsTrailer  Trip[] @relation("TrailerTrips")
-  handoffs        EquipmentHandoff[]
+  tripsAsTruck       Trip[]             @relation("TruckTrips")
+  tripsAsTrailer     Trip[]             @relation("TrailerTrips")
+  handoffs           EquipmentHandoff[]
   handoffsAsReplaced EquipmentHandoff[] @relation("ReplacedEquipment")
-  trailerHandoffs     EquipmentHandoff[] @relation("TrailerHandoff")
+  trailerHandoffs    EquipmentHandoff[] @relation("TrailerHandoff")
 }
 
 // ============================================================
 // MODEL: EquipmentHandoff
 // ============================================================
 model EquipmentHandoff {
-  id              String   @id @default(cuid())
-  
-  // What happened
-  action          EquipmentHandoffAction
-  reason          EquipmentHandoffReason?
-  reasonNote      String?
-  
-  // Who - Driver (primary)
-  driverId        String
-  driver          Driver   @relation(fields: [driverId], references: [id])
-  
-  // Who - Dispatcher (optional approver)
-  dispatcherId    String?
-  dispatcher      Driver?  @relation("ApproverDriver", fields: [dispatcherId], references: [id])
-  
-  // Equipment involved (primary)
-  equipmentId     String
-  equipment       Equipment @relation(fields: [equipmentId], references: [id])
-  
-  // For swaps: what was replaced
-  replacedEquipmentId String?
-  replacedEquipment   Equipment? @relation("ReplacedEquipment", fields: [replacedEquipmentId], references: [id])
-  
-  // Trailer tracking
-  trailerId       String?
-  trailer         Equipment? @relation("TrailerHandoff", fields: [trailerId], references: [id])
-  previousTrailerId String?
-  
-  // Timing
-  checkOutTime    DateTime @default(now())
-  returnTime      DateTime?
-  shiftStartTime  DateTime?
-  shiftEndTime    DateTime?
-  
-  // Location
-  checkOutLocation String?
-  returnLocation  String?
-  
-  // Vehicle data
-  odometerStart   Int?
-  fuelLevelStart  String?
-  odometerEnd     Int?
-  fuelLevelEnd    String?
-  
-  // Condition checks
-  preTripCompleted Boolean @default(false)
-  preTripNotes    String?
-  postTripCompleted Boolean @default(false)
-  postTripNotes   String?
-  
-  // Damage reporting
-  damageReported  Boolean @default(false)
-  damageDescription String?
-  damagePhoto     String?
-  
-  // Status tracking
-  isActive        Boolean @default(true)
-  returnedBy      String?
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
+  id                    String                  @id @default(cuid())
+  action                EquipmentHandoffAction
+  reason                EquipmentHandoffReason?
+  reasonNote            String?
+  driverId              String
+  driver                Driver                  @relation(fields: [driverId], references: [id])
+  dispatcherId          String?
+  dispatcher            Driver?                 @relation("ApproverDriver", fields: [dispatcherId], references: [id])
+  equipmentId           String
+  equipment             Equipment               @relation(fields: [equipmentId], references: [id])
+  replacedEquipmentId   String?
+  replacedEquipment     Equipment?              @relation("ReplacedEquipment", fields: [replacedEquipmentId], references: [id])
+  trailerId             String?
+  trailer               Equipment?              @relation("TrailerHandoff", fields: [trailerId], references: [id])
+  previousTrailerId     String?
+
+  // null = morning handoff / board / swap
+  // set  = created by dispatch trip or backup (safe to release on trip cancel)
+  tripId                String?
+  trip                  Trip?                   @relation(fields: [tripId], references: [id], onDelete: SetNull)
+
+  checkOutTime          DateTime                @default(now())
+  returnTime            DateTime?
+  shiftStartTime        DateTime?
+  shiftEndTime          DateTime?
+  checkOutLocation      String?
+  returnLocation        String?
+  odometerStart         Int?
+  fuelLevelStart        String?
+  odometerEnd           Int?
+  fuelLevelEnd          String?
+  preTripCompleted      Boolean                 @default(false)
+  preTripNotes          String?
+  postTripCompleted     Boolean                 @default(false)
+  postTripNotes         String?
+  damageReported        Boolean                 @default(false)
+  damageDescription     String?
+  damagePhoto           String?
+  isActive              Boolean                 @default(true)
+  returnedBy            String?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+
   @@index([driverId])
   @@index([equipmentId])
   @@index([trailerId])
   @@index([checkOutTime])
   @@index([isActive])
   @@index([action])
+  @@index([tripId])
 }
 
 // ============================================================
 // MODEL: Shipment
 // ============================================================
 model Shipment {
-  id                    String   @id @default(cuid())
+  id                    String    @id @default(cuid())
   type                  String
-  status                String   @default("Pending")
+  status                String    @default("Pending")
   pieces                Int
   weight                Float
-  weightUnit            String   @default("lb")
+  weightUnit            String    @default("lb")
   notes                 String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
   airwaybillNumber      String?
-  pmcCount              Int      @default(0)
+  pmcCount              Int       @default(0)
   ordNumber             String?
   lastFreeDay           DateTime?
-  storageFeePerDay      Float    @default(0)
-  storageFeeDaysOver    Int      @default(0)
-  storageFeePaid        Boolean  @default(false)
-  terminalFee           Float    @default(0)
-  terminalFeePaid       Boolean  @default(false)
-  isGDP                 Boolean  @default(false)
+  storageFeePerDay      Float     @default(0)
+  storageFeeDaysOver    Int       @default(0)
+  storageFeePaid        Boolean   @default(false)
+  terminalFee           Float     @default(0)
+  terminalFeePaid       Boolean   @default(false)
+  isGDP                 Boolean   @default(false)
   gdpTemperatureRange   String?
   flightDate            DateTime?
   lockoutTime           DateTime?
@@ -279,27 +258,36 @@ model Shipment {
   deliveryAppointmentAt DateTime?
   airlineId             String?
   warehouseId           String?
-  airline               Airline?   @relation(fields: [airlineId], references: [id])
+  airline               Airline?  @relation(fields: [airlineId], references: [id])
   warehouse             Warehouse? @relation(fields: [warehouseId], references: [id])
-  trips                 Trip[]     @relation("ShipmentTrips")
+  trips                 Trip[]    @relation("ShipmentTrips")
   tripSplits            TripShipmentSplit[]
   shipmentGroups        ShipmentGroupShipment[]
+
+  parentShipmentId String?
+  parentShipment   Shipment?  @relation("ShipmentShortSplit", fields: [parentShipmentId], references: [id])
+  childShipments   Shipment[] @relation("ShipmentShortSplit")
+
+  exceptions ShipmentException[]
+
+  @@index([parentShipmentId])
 }
 
 // ============================================================
 // MODEL: ShipmentGroup
 // ============================================================
 model ShipmentGroup {
-  id          String   @id @default(cuid())
-  name        String
-  type        String
-  truckType   String?
+  id            String   @id @default(cuid())
+  name          String
+  type          String
+  truckType     String?
   trailerNumber String?
-  doorNumber  String?
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  shipments   ShipmentGroupShipment[]
+  doorNumber    String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  shipments ShipmentGroupShipment[]
 }
 
 // ============================================================
@@ -309,8 +297,10 @@ model ShipmentGroupShipment {
   shipmentId      String
   shipmentGroupId String
   addedAt         DateTime @default(now())
+
   shipment      Shipment      @relation(fields: [shipmentId], references: [id])
   shipmentGroup ShipmentGroup @relation(fields: [shipmentGroupId], references: [id])
+
   @@id([shipmentId, shipmentGroupId])
 }
 
@@ -318,29 +308,34 @@ model ShipmentGroupShipment {
 // MODEL: Trip
 // ============================================================
 model Trip {
-  id                       String   @id @default(cuid())
-  tripNumber               String   @unique
-  runType                  String
-  plannedDepartureTime     DateTime?
-  expectedCompletionTime   DateTime?
-  startTime                DateTime?
-  finishTime               DateTime?
-  status                   String   @default("Scheduled")
-  notes                    String?
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
-  driverId                 String?
-  truckId                  String?
-  trailerId                String?
-  driver                   Driver?    @relation(fields: [driverId], references: [id])
-  truck                    Equipment? @relation("TruckTrips", fields: [truckId], references: [id])
-  trailer                  Equipment? @relation("TrailerTrips", fields: [trailerId], references: [id])
-  shipmentIds              String[]
-  shipments                Shipment[] @relation("ShipmentTrips")
-  parentTripId             String?
-  parentTrip               Trip?   @relation("TripSplits", fields: [parentTripId], references: [id])
-  splitTrips               Trip[]  @relation("TripSplits")
-  shipmentSplits           TripShipmentSplit[]
+  id                     String    @id @default(cuid())
+  tripNumber             String    @unique
+  runType                String
+  plannedDepartureTime   DateTime?
+  expectedCompletionTime DateTime?
+  startTime              DateTime?
+  finishTime             DateTime?
+  status                 String    @default("Scheduled")
+  notes                  String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  driverId               String?
+  truckId                String?
+  trailerId              String?
+  driver                 Driver?    @relation(fields: [driverId], references: [id])
+  truck                  Equipment? @relation("TruckTrips", fields: [truckId], references: [id])
+  trailer                Equipment? @relation("TrailerTrips", fields: [trailerId], references: [id])
+  shipmentIds            String[]
+  shipments              Shipment[] @relation("ShipmentTrips")
+  parentTripId           String?
+  parentTrip             Trip?      @relation("TripSplits", fields: [parentTripId], references: [id])
+  splitTrips             Trip[]     @relation("TripSplits")
+  shipmentSplits         TripShipmentSplit[]
+  handoff                TripHandoff?
+  exceptions             ShipmentException[]
+
+  // Handoffs created specifically for this trip (DISPATCH + tripId set)
+  equipmentHandoffs      EquipmentHandoff[]
 }
 
 // ============================================================
@@ -354,9 +349,49 @@ model TripShipmentSplit {
   weight     Float
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
   trip     Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
   shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
   @@unique([tripId, shipmentId])
+}
+
+// ============================================================
+// MODEL: TripHandoff
+// ============================================================
+model TripHandoff {
+  id                String   @id @default(cuid())
+  tripId            String   @unique
+  trip              Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  finishTime        DateTime
+  podImageUrl       String?
+  signatureImageUrl String?
+  receivedByName    String?
+  notes             String?
+  createdAt         DateTime @default(now())
+}
+
+// ============================================================
+// MODEL: ShipmentException
+// ============================================================
+model ShipmentException {
+  id             String    @id @default(cuid())
+  tripId         String
+  shipmentId     String
+  type           String
+  piecesAffected Int?
+  reason         String?
+  photoUrl       String?
+  resolution     String?
+  resolvedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  trip     Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@index([shipmentId])
+  @@index([type])
 }
 
 // ============================================================
@@ -375,16 +410,25 @@ model User {
 // MODEL: Warehouse
 // ============================================================
 model Warehouse {
-  id              String   @id @default(cuid())
-  name            String
-  address         String?
-  contactPhone    String?  @db.VarChar(20)
-  is24Hours       Boolean  @default(false)
-  daysOpen        String[] @default([])
-  openTime        String?  @db.VarChar(5)
-  closeTime       String?  @db.VarChar(5)
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  shipments       Shipment[]
+  id           String   @id @default(cuid())
+  name         String
+  address      String?
+  contactPhone String?  @db.VarChar(20)
+  is24Hours    Boolean  @default(false)
+  daysOpen     String[] @default([])
+  openTime     String?  @db.VarChar(5)
+  closeTime    String?  @db.VarChar(5)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  shipments Shipment[]
+}
+
+// ============================================================
+// MODEL: TripSequence (Atomic Counter)
+// ============================================================
+model TripSequence {
+  id       Int @id @default(1)
+  lastUsed Int @default(0)
 }

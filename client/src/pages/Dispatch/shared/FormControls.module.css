@@ -1,0 +1,257 @@
+/* ═══════════════════════════════════════════════════════════════
+   Shared form controls — used by all modals in Dispatch.
+   Import as: import formStyles from "../../shared/FormControls.module.css";
+   ═══════════════════════════════════════════════════════════════ */
+
+.form {
+  display: flex;
+  flex-direction: column;
+}
+
+.formIntro {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+  margin-bottom: 24px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.form label {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.form label span {
+  font-weight: 400;
+}
+
+.form input,
+.form select {
+  width: 100%;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 10px;
+  outline: none;
+}
+
+.form input:focus,
+.form select:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.12);
+}
+
+.form select:disabled,
+.form input:disabled {
+  opacity: 0.85;
+  cursor: not-allowed;
+  background: rgba(0, 212, 255, 0.06);
+  border-color: rgba(0, 212, 255, 0.28);
+  color: var(--text-primary);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+
+.primaryButton {
+  color: #06101e;
+  background: linear-gradient(135deg, var(--accent-cyan), #70b7ff);
+  border-radius: 9px;
+  padding: 11px 16px;
+  font-weight: 800;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  box-shadow: 0 5px 22px rgba(0, 212, 255, 0.18);
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  transition: opacity 0.15s ease;
+}
+
+.primaryButton:hover {
+  opacity: 0.9;
+}
+
+.primaryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.cancel {
+  padding: 10px 14px;
+  color: var(--text-secondary);
+  background: transparent;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  border-radius: 8px;
+  font-size: 13px;
+  transition: color 0.15s ease;
+}
+
+.cancel:hover {
+  color: var(--text-primary);
+}
+
+/* ── Error banner ────────────────────────────────────────────── */
+
+.error {
+  background: var(--danger-bg);
+  border: 1px solid rgba(255, 71, 87, 0.25);
+  color: #ff9ca5;
+  padding: 10px 13px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 24px;
+}
+
+/* ── Field hints ─────────────────────────────────────────────── */
+
+.fieldHint {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.fieldHintGood {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--success);
+  line-height: 1.4;
+}
+
+/* ── Warning strip ───────────────────────────────────────────── */
+
+.handoffWarn {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-top: 4px;
+  margin-bottom: 8px;
+  background: var(--warning-bg);
+  border: 1px solid rgba(255, 179, 71, 0.35);
+  border-radius: 8px;
+  color: var(--warning);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.handoffWarn svg {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+/* ── Manifest picker (shared between Build Run & Backup modals) ── */
+
+.manifestPicker {
+  margin-top: 21px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  max-height: 330px;
+  overflow: auto;
+}
+
+.pickerTitle {
+  padding: 14px 18px;
+  font-size: 12px;
+  font-weight: 800;
+  border-bottom: 1px solid var(--border);
+}
+
+.pickerTitle span {
+  color: var(--accent-cyan);
+  float: right;
+  font-weight: 600;
+}
+
+.pickRow {
+  width: 100%;
+  display: flex;
+  text-align: left;
+  gap: 11px;
+  padding: 14px 18px;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.pickRow:last-child {
+  border-bottom: 0;
+}
+
+.pickRow.picked {
+  background: rgba(0, 212, 255, 0.055);
+}
+
+.pickRow > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.pickRow strong,
+.pickRow > div > span {
+  display: block;
+}
+
+.pickRow > div > span {
+  color: var(--text-secondary);
+  font-size: 11px;
+  margin-top: 3px;
+}
+
+.checkbox {
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--border-hover);
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  color: transparent;
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.picked .checkbox {
+  color: #06101e;
+  background: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+}
+
+.noCargo {
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 18px;
+}
+
+/* ── Responsive ──────────────────────────────────────────────── */
+
+@media (max-width: 700px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+}

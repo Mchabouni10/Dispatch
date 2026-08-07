@@ -7,6 +7,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { getWarehouses, createWarehouse, updateWarehouse, deleteWarehouse } from '../../api/api.js';
 import Modal from '../../components/Modal/Modal.jsx';
+import TimePicker from '../../styles/TimePicker.jsx';
 import styles from './WarehousesView.module.css';
 import tableStyles from './WarehousesView.table.module.css';
 
@@ -381,11 +382,19 @@ export default function WarehousesView() {
                 <div className={styles.timeRow}>
                   <div className={styles.formGroup}>
                     <label className={styles.label}>Opens</label>
-                    <input id="wh-open-time" type="time" className={styles.input} value={form.openTime} onChange={e => setForm(f => ({ ...f, openTime: e.target.value }))} />
+                    <TimePicker
+                      value={form.openTime || null}
+                      onChange={(t) => setForm(f => ({ ...f, openTime: t || '' }))}
+                      placeholder="Select open time"
+                    />
                   </div>
                   <div className={styles.formGroup}>
                     <label className={styles.label}>Closes</label>
-                    <input id="wh-close-time" type="time" className={styles.input} value={form.closeTime} onChange={e => setForm(f => ({ ...f, closeTime: e.target.value }))} />
+                    <TimePicker
+                      value={form.closeTime || null}
+                      onChange={(t) => setForm(f => ({ ...f, closeTime: t || '' }))}
+                      placeholder="Select close time"
+                    />
                   </div>
                 </div>
               )}
@@ -414,4 +423,6 @@ export default function WarehousesView() {
     </div>
   );
 }
+
+
 

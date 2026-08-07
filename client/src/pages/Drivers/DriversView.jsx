@@ -48,6 +48,7 @@ import {
   resolveUploadUrl,
 } from "../../api/api.js";
 import Modal from "../../components/Modal/Modal.jsx";
+import DateTimePicker from "../../styles/Datetimepicker.jsx";
 import styles from "./DriversView.module.css";
 import tableStyles from "./DriversView.table.module.css";
 
@@ -603,6 +604,55 @@ export default function DriversView() {
     };
   }, [drivers]);
 
+  // Drivers whose license or DOT medical card is expired or expiring within
+  // 30 days. Terminated drivers are excluded since they're no longer active.
+  const complianceAlerts = useMemo(() => {
+    const alerts = [];
+    drivers.forEach((d) => {
+      if (d.employmentStatus === "Terminated") return;
+
+      const licenseDays = daysUntil(d.licenseExpiration);
+      if (licenseDays !== null && licenseDays <= 30) {
+        alerts.push({
+          id: `${d.id}-license`,
+          driver: d,
+          type: "license",
+          label: "Driver License",
+          days: licenseDays,
+          expired: licenseDays < 0,
+        });
+      }
+
+      const medicalDays = daysUntil(d.medicalCertExpiration);
+      if (medicalDays !== null && medicalDays <= 30) {
+        alerts.push({
+          id: `${d.id}-medical`,
+          driver: d,
+          type: "medical",
+          label: "DOT Medical Card",
+          days: medicalDays,
+          expired: medicalDays < 0,
+        });
+      }
+    });
+    // Expired items first, then soonest-expiring
+    alerts.sort((a, b) => a.days - b.days);
+    return alerts;
+  }, [drivers]);
+
+  const expiredAlertsCount = complianceAlerts.filter((a) => a.expired).length;
+  const expiringAlertsCount = complianceAlerts.length - expiredAlertsCount;
+
+  const [alertsExpanded, setAlertsExpanded] = useState(true);
+  const [alertsDismissed, setAlertsDismissed] = useState(false);
+
+  // Bring the banner back if the set of alerts changes after a dismissal
+  // (e.g. a new driver's license just expired).
+  const alertsSignature = complianceAlerts.map((a) => a.id).join(",");
+  useEffect(() => {
+    setAlertsDismissed(false);
+  }, [alertsSignature]);
+
   const StatusBadgeWithIcon = ({ status }) => {
     const icon = STATUS_ICONS[status] || faCircleUser;
     const statusClass = status?.replace(" ", "_") || "Unknown";
@@ -644,6 +694,92 @@ export default function DriversView() {
           </button>
         </div>
       </div>
+
+      {complianceAlerts.length > 0 && !alertsDismissed && (
+        <div
+          className={`${styles.alertsBanner} ${
+            expiredAlertsCount > 0
+              ? styles.alertsBannerDanger
+              : styles.alertsBannerWarning
+          }`}
+        >
+          <div className={styles.alertsBannerHeader}>
+            <button
+              type="button"
+              className={styles.alertsBannerTitle}
+              onClick={() => setAlertsExpanded((v) => !v)}
+              aria-expanded={alertsExpanded}
+            >
+              <FontAwesomeIcon icon={faTriangleExclamation} />
+              <span>
+                {expiredAlertsCount > 0 && (
+                  <strong>
+                    {expiredAlertsCount} expired
+                  </strong>
+                )}
+                {expiredAlertsCount > 0 && expiringAlertsCount > 0 && " · "}
+                {expiringAlertsCount > 0 && (
+                  <strong>
+                    {expiringAlertsCount} expiring within 30 days
+                  </strong>
+                )}
+                <span className={styles.alertsBannerSub}>
+                  {" "}
+                  — driver license / DOT medical card
+                </span>
+              </span>
+              <FontAwesomeIcon
+                icon={faChevronDown}
+                className={`${styles.alertsChevron} ${
+                  alertsExpanded ? styles.alertsChevronOpen : ""
+                }`}
+              />
+            </button>
+            <button
+              type="button"
+              className={styles.alertsDismissBtn}
+              onClick={() => setAlertsDismissed(true)}
+              title="Dismiss"
+              aria-label="Dismiss alerts"
+            >
+              <FontAwesomeIcon icon={faTimes} />
+            </button>
+          </div>
+
+          {alertsExpanded && (
+            <div className={styles.alertsList}>
+              {complianceAlerts.map((a) => (
+                <button
+                  type="button"
+                  key={a.id}
+                  className={`${styles.alertItem} ${
+                    a.expired
+                      ? styles.alertItemExpired
+                      : styles.alertItemWarning
+                  }`}
+                  onClick={() => openEdit(a.driver)}
+                  title="Open driver to update"
+                >
+                  <FontAwesomeIcon
+                    icon={a.type === "license" ? faIdCard : faShieldHalved}
+                  />
+                  <span className={styles.alertItemName}>
+                    {a.driver.name}
+                  </span>
+                  <span className={styles.alertItemLabel}>{a.label}</span>
+                  <span className={styles.alertItemDetail}>
+                    {a.expired
+                      ? `Expired ${Math.abs(a.days)}d ago`
+                      : a.days === 0
+                        ? "Expires today"
+                        : `Expires in ${a.days}d`}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className={styles.statsBar}>
         <div className={`${styles.statCard} ${styles.statTotal}`}>
@@ -1246,13 +1382,13 @@ export default function DriversView() {
             </div>
             <div className={styles.formGroup}>
               <label className={styles.label}>Date of Birth</label>
-              <input
-                id="driver-dob"
-                className={styles.input}
-                type="date"
-                value={form.dateOfBirth}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, dateOfBirth: e.target.value }))
+              <DateTimePicker
+                value={form.dateOfBirth || ""}
+                onChange={(date) =>
+                  setForm((f) => ({
+                    ...f,
+                    dateOfBirth: date ? date.toISOString().slice(0, 10) : "",
+                  }))
                 }
               />
             </div>
@@ -1316,27 +1452,25 @@ export default function DriversView() {
               <>
                 <div className={styles.formGroup}>
                   <label className={styles.label}>Leave Start *</label>
-                  <input
-                    id="driver-leave-start"
-                    className={styles.input}
-                    type="date"
-                    required
-                    value={form.leaveStart}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, leaveStart: e.target.value }))
+                  <DateTimePicker
+                    value={form.leaveStart || ""}
+                    onChange={(date) =>
+                      setForm((f) => ({
+                        ...f,
+                        leaveStart: date ? date.toISOString().slice(0, 10) : "",
+                      }))
                     }
                   />
                 </div>
                 <div className={styles.formGroup}>
                   <label className={styles.label}>Leave End *</label>
-                  <input
-                    id="driver-leave-end"
-                    className={styles.input}
-                    type="date"
-                    required
-                    value={form.leaveEnd}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, leaveEnd: e.target.value }))
+                  <DateTimePicker
+                    value={form.leaveEnd || ""}
+                    onChange={(date) =>
+                      setForm((f) => ({
+                        ...f,
+                        leaveEnd: date ? date.toISOString().slice(0, 10) : "",
+                      }))
                     }
                   />
                 </div>
@@ -1520,34 +1654,30 @@ export default function DriversView() {
             </div>
             <div className={styles.formGroup}>
               <label className={styles.label}>License Expiration *</label>
-              <input
-                id="driver-license-exp"
-                className={styles.input}
-                type="date"
-                required
-                value={form.licenseExpiration}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, licenseExpiration: e.target.value }))
+              <DateTimePicker
+                value={form.licenseExpiration || ""}
+                onChange={(date) =>
+                  setForm((f) => ({
+                    ...f,
+                    licenseExpiration: date ? date.toISOString().slice(0, 10) : "",
+                  }))
                 }
               />
             </div>
             <div className={styles.formGroup}>
               <label className={styles.label}>
                 DOT Medical Card Expiration
-                {["A", "B"].includes(form.licenseClass) ||
-                (form.vehicleTypes || []).includes("Tractor")
+                {(["A", "B"].includes(form.licenseClass) ||
+                (form.vehicleTypes || []).includes("Tractor"))
                   ? " *"
                   : ""}
               </label>
-              <input
-                id="driver-med-exp"
-                className={styles.input}
-                type="date"
-                value={form.medicalCertExpiration}
-                onChange={(e) =>
+              <DateTimePicker
+                value={form.medicalCertExpiration || ""}
+                onChange={(date) =>
                   setForm((f) => ({
                     ...f,
-                    medicalCertExpiration: e.target.value,
+                    medicalCertExpiration: date ? date.toISOString().slice(0, 10) : "",
                   }))
                 }
               />
@@ -1841,13 +1971,13 @@ export default function DriversView() {
 
             <div className={styles.formGroup}>
               <label className={styles.label}>Hire Date</label>
-              <input
-                id="driver-hire-date"
-                className={styles.input}
-                type="date"
-                value={form.hireDate}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, hireDate: e.target.value }))
+              <DateTimePicker
+                value={form.hireDate || ""}
+                onChange={(date) =>
+                  setForm((f) => ({
+                    ...f,
+                    hireDate: date ? date.toISOString().slice(0, 10) : "",
+                  }))
                 }
               />
             </div>

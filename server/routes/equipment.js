@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
+const { checkoutEquipment, releaseEquipment } = require('../lib/equipmentHandoff');
 
 // ──────────────────────────────────────────────────────────────
 // 1. GET all equipment
@@ -134,12 +135,9 @@ router.get('/history/equipment/:equipmentId', async (req, res) => {
 // 5. POST swap equipment mid-shift
 // ──────────────────────────────────────────────────────────────
 router.post('/:id/swap', async (req, res) => {
-  console.log('[POST /api/equipment/:id/swap] Called with ID:', req.params.id);
-  console.log('[POST /api/equipment/:id/swap] Body:', JSON.stringify(req.body, null, 2));
-
   try {
-    const { 
-      driverId, 
+    const {
+      driverId,
       newEquipmentId,
       trailerId,
       reason = 'DRIVER_REQUEST',
@@ -150,158 +148,112 @@ router.post('/:id/swap', async (req, res) => {
     if (!driverId) {
       return res.status(400).json({ message: 'driverId is required' });
     }
-
     if (!newEquipmentId) {
       return res.status(400).json({ message: 'newEquipmentId is required' });
     }
 
-    const driver = await prisma.driver.findUnique({
-      where: { id: driverId },
-    });
-
+    const driver = await prisma.driver.findUnique({ where: { id: driverId } });
     if (!driver) {
       return res.status(404).json({ message: 'Driver not found' });
     }
 
     const activeHandoff = await prisma.equipmentHandoff.findFirst({
-      where: {
-        driverId,
-        isActive: true,
-        equipmentId: req.params.id,
-      },
+      where: { driverId, isActive: true, equipmentId: req.params.id },
     });
-
     if (!activeHandoff) {
-      return res.status(400).json({ 
-        message: 'Driver has no active handoff for this equipment' 
+      return res.status(400).json({
+        message: 'Driver has no active handoff for this equipment',
       });
     }
 
     const newEquipment = await prisma.equipment.findUnique({
       where: { id: newEquipmentId },
     });
-
     if (!newEquipment) {
       return res.status(404).json({ message: 'New equipment not found' });
     }
-
     if (newEquipment.assignedDriverId) {
-      return res.status(400).json({ 
-        message: 'New equipment is already assigned to another driver' 
+      return res.status(400).json({
+        message: 'New equipment is already assigned to another driver',
+      });
+    }
+    if (newEquipment.availableAt && new Date(newEquipment.availableAt) > new Date()) {
+      return res.status(400).json({
+        message: 'New equipment is in cooldown and not yet available',
       });
     }
 
-    if (newEquipment.availableAt && new Date(newEquipment.availableAt) > new Date()) {
-      return res.status(400).json({ 
-        message: 'New equipment is in cooldown and not yet available' 
-      });
+    let newTrailer = null;
+    if (trailerId) {
+      newTrailer = await prisma.equipment.findUnique({ where: { id: trailerId } });
+      if (!newTrailer) {
+        return res.status(404).json({ message: 'Trailer not found' });
+      }
+      if (newTrailer.assignedDriverId && newTrailer.assignedDriverId !== driverId) {
+        return res.status(400).json({
+          message: 'Trailer is already assigned to another driver',
+        });
+      }
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Return old equipment
-      await tx.equipment.update({
-        where: { id: req.params.id },
-        data: { assignedDriverId: null },
+      // 1. Release the old truck (closes its handoff, clears assignment — no cooldown, it's an active swap not a shift end)
+      await releaseEquipment(tx, {
+        equipmentId: req.params.id,
+        cooldownMinutes: 0,
+        reason,
+        reasonNote: reasonNote || 'Equipment swapped mid-shift',
       });
 
-      // 2. Close old handoff with SWAP action
-      await tx.equipmentHandoff.update({
-        where: { id: activeHandoff.id },
-        data: {
-          isActive: false,
-          returnTime: new Date(),
-          action: 'SWAP',
-          reason: reason,
-          reasonNote: reasonNote || 'Equipment swapped mid-shift',
-          replacedEquipmentId: newEquipmentId,
-        },
+      // 2. Check out the new truck to the driver
+      await checkoutEquipment(tx, {
+        equipmentId: newEquipmentId,
+        driverId,
+        action: 'SWAP',
+        reason,
+        reasonNote: reasonNote || 'Equipment swapped mid-shift',
+        dispatcherId,
+        trailerId: trailerId || undefined,
+        shiftStartTime: activeHandoff.shiftStartTime,
+        shiftEndTime: activeHandoff.shiftEndTime,
       });
 
-      // 3. Assign new equipment
-      await tx.equipment.update({
-        where: { id: newEquipmentId },
-        data: { 
-          assignedDriverId: driverId,
-          availableAt: null,
-        },
-      });
-
-      // 4. Create new handoff
-      await tx.equipmentHandoff.create({
-        data: {
-          driverId,
-          equipmentId: newEquipmentId,
-          action: 'SWAP',
-          reason: reason,
-          reasonNote: reasonNote || 'Equipment swapped mid-shift',
-          checkOutTime: new Date(),
-          isActive: true,
-          dispatcherId: dispatcherId || null,
-          ...(trailerId && { trailerId }),
-          replacedEquipmentId: req.params.id,
-          shiftStartTime: activeHandoff.shiftStartTime,
-          shiftEndTime: activeHandoff.shiftEndTime,
-        },
-      });
-
-      // 5. Handle trailer if provided
-      if (trailerId) {
+      // 3. Trailer swap, if a different trailer than what's currently held was provided
+      if (trailerId && !(newTrailer && newTrailer.assignedDriverId === driverId)) {
         const oldTrailerHandoff = await tx.equipmentHandoff.findFirst({
-          where: {
-            driverId,
-            trailerId: { not: null },
-            isActive: true,
-          },
+          where: { driverId, trailerId: { not: null }, isActive: true },
         });
-
-        if (oldTrailerHandoff) {
-          await tx.equipmentHandoff.update({
-            where: { id: oldTrailerHandoff.id },
-            data: {
-              isActive: false,
-              returnTime: new Date(),
-            },
+        if (oldTrailerHandoff && oldTrailerHandoff.trailerId) {
+          await releaseEquipment(tx, {
+            equipmentId: oldTrailerHandoff.trailerId,
+            cooldownMinutes: 0,
+            reason,
+            reasonNote: reasonNote || 'Trailer swapped mid-shift',
           });
         }
 
-        await tx.equipment.update({
-          where: { id: trailerId },
-          data: { assignedDriverId: driverId },
-        });
-
-        await tx.equipmentHandoff.create({
-          data: {
-            driverId,
-            equipmentId: trailerId,
-            action: 'SWAP',
-            reason: reason,
-            reasonNote: reasonNote || 'Trailer swapped mid-shift',
-            checkOutTime: new Date(),
-            isActive: true,
-            dispatcherId: dispatcherId || null,
-            shiftStartTime: activeHandoff.shiftStartTime,
-            shiftEndTime: activeHandoff.shiftEndTime,
-          },
+        await checkoutEquipment(tx, {
+          equipmentId: trailerId,
+          driverId,
+          action: 'SWAP',
+          reason,
+          reasonNote: reasonNote || 'Trailer swapped mid-shift',
+          dispatcherId,
+          shiftStartTime: activeHandoff.shiftStartTime,
+          shiftEndTime: activeHandoff.shiftEndTime,
         });
       }
 
-      return await tx.equipment.findUnique({
+      return tx.equipment.findUnique({
         where: { id: newEquipmentId },
         include: {
           assignedDriver: {
-            select: {
-              id: true,
-              name: true,
-              photo: true,
-              employeeId: true,
-              status: true,
-            },
+            select: { id: true, name: true, photo: true, employeeId: true, status: true },
           },
         },
       });
     });
 
-    console.log('[POST /api/equipment/:id/swap] Swap completed successfully');
     res.json(result);
   } catch (err) {
     console.error('[POST /api/equipment/:id/swap] Error:', err);
@@ -314,12 +266,17 @@ router.post('/:id/swap', async (req, res) => {
 
 // ──────────────────────────────────────────────────────────────
 // 6. PATCH assign/release with full history logging
+//
+// NOTE: release now optionally accepts trailerId so end-of-shift can
+// release the truck AND its paired trailer atomically — previously only
+// req.params.id (the truck) was ever released, leaving trailers stuck
+// "assigned" to off-duty drivers indefinitely.
 // ──────────────────────────────────────────────────────────────
 router.patch('/:id/assign', async (req, res) => {
   try {
-    const { 
-      driverId, 
-      release, 
+    const {
+      driverId,
+      release,
       cooldownMinutes,
       action = 'CHECKOUT',
       reason = 'SHIFT_START',
@@ -331,126 +288,85 @@ router.patch('/:id/assign', async (req, res) => {
     } = req.body;
 
     if (release) {
-      // Find active handoff (may not exist for older assignments made before handoff logging)
-      const activeHandoff = await prisma.equipmentHandoff.findFirst({
-        where: {
+      await prisma.$transaction(async (tx) => {
+        // Capture the truck's current holder BEFORE releasing it — release
+        // clears assignedDriverId, so this is the last point we can find
+        // "their" trailer if the caller didn't pass trailerId explicitly.
+        let trailerToRelease = trailerId;
+        if (!trailerToRelease) {
+          const truck = await tx.equipment.findUnique({ where: { id: req.params.id } });
+          if (truck?.assignedDriverId) {
+            const pairedTrailer = await tx.equipment.findFirst({
+              where: { assignedDriverId: truck.assignedDriverId, category: 'Trailer' },
+            });
+            if (pairedTrailer) trailerToRelease = pairedTrailer.id;
+          }
+        }
+
+        await releaseEquipment(tx, {
           equipmentId: req.params.id,
-          isActive: true,
-        },
-        orderBy: { checkOutTime: 'desc' },
-      });
-
-      // Always clear the assignment on the equipment
-      await prisma.equipment.update({
-        where: { id: req.params.id },
-        data: {
-          assignedDriverId: null,
-          availableAt: cooldownMinutes > 0
-            ? new Date(Date.now() + cooldownMinutes * 60 * 1000)
-            : null,
-        },
-      });
-
-      // Close handoff only if one exists — do NOT error when missing
-      if (activeHandoff) {
-        await prisma.equipmentHandoff.update({
-          where: { id: activeHandoff.id },
-          data: {
-            isActive: false,
-            returnTime: new Date(),
-            action: 'RETURN',
-            reason: reason || 'SHIFT_END',
-            reasonNote: reasonNote || 'End of shift',
-            ...(req.body.odometerEnd && { odometerEnd: parseInt(req.body.odometerEnd) }),
-            ...(req.body.fuelLevelEnd && { fuelLevelEnd: req.body.fuelLevelEnd }),
-            ...(req.body.postTripNotes && {
-              postTripNotes: req.body.postTripNotes,
-              postTripCompleted: true,
-            }),
-            ...(req.body.damageDescription && {
-              damageReported: true,
-              damageDescription: req.body.damageDescription,
-            }),
-          },
+          cooldownMinutes: cooldownMinutes > 0 ? cooldownMinutes : 0,
+          reason: reason || 'SHIFT_END',
+          reasonNote: reasonNote || 'End of shift',
+          odometerEnd: req.body.odometerEnd,
+          fuelLevelEnd: req.body.fuelLevelEnd,
+          postTripNotes: req.body.postTripNotes,
+          damageDescription: req.body.damageDescription,
         });
-      }
 
+        if (trailerToRelease) {
+          await releaseEquipment(tx, {
+            equipmentId: trailerToRelease,
+            cooldownMinutes: cooldownMinutes > 0 ? cooldownMinutes : 0,
+            reason: reason || 'SHIFT_END',
+            reasonNote: reasonNote || 'End of shift (trailer released with truck)',
+          });
+        }
+      });
     } else {
       // Checkout
       if (!driverId) {
         return res.status(400).json({ message: 'driverId is required' });
       }
-
-      const driver = await prisma.driver.findUnique({
-        where: { id: driverId },
-      });
-
+      const driver = await prisma.driver.findUnique({ where: { id: driverId } });
       if (!driver) {
         return res.status(404).json({ message: 'Driver not found' });
       }
 
-      // Update equipment
-      await prisma.equipment.update({
-        where: { id: req.params.id },
-        data: { 
-          assignedDriverId: driverId, 
-          availableAt: null,
-        },
-      });
-
-      // Create handoff
-      await prisma.equipmentHandoff.create({
-        data: {
-          driverId,
+      await prisma.$transaction(async (tx) => {
+        await checkoutEquipment(tx, {
           equipmentId: req.params.id,
+          driverId,
           action: action || 'CHECKOUT',
           reason: reason || 'SHIFT_START',
           reasonNote: reasonNote || '',
-          checkOutTime: new Date(),
-          isActive: true,
-          ...(dispatcherId && { dispatcherId }),
-          ...(trailerId && { trailerId }),
-          ...(odometerStart && { odometerStart: parseInt(odometerStart) }),
-          ...(fuelLevelStart && { fuelLevelStart }),
+          dispatcherId,
+          trailerId: trailerId || undefined,
+          odometerStart,
+          fuelLevelStart,
           shiftStartTime: driver.shiftStartTime || new Date(),
           shiftEndTime: driver.shiftEndTime || null,
-        },
-      });
-
-      // Handle trailer
-      if (trailerId) {
-        await prisma.equipment.update({
-          where: { id: trailerId },
-          data: { assignedDriverId: driverId },
+          preTripCompleted: true,
         });
 
-        await prisma.equipmentHandoff.create({
-          data: {
-            driverId,
+        if (trailerId) {
+          await checkoutEquipment(tx, {
             equipmentId: trailerId,
+            driverId,
             action: 'CHECKOUT',
             reason: reason || 'SHIFT_START',
             reasonNote: reasonNote || 'Trailer assigned with truck',
-            checkOutTime: new Date(),
-            isActive: true,
-            ...(dispatcherId && { dispatcherId }),
-          },
-        });
-      }
+            dispatcherId,
+          });
+        }
+      });
     }
 
-    // Get updated equipment
     const item = await prisma.equipment.findUnique({
       where: { id: req.params.id },
       include: {
         assignedDriver: {
-          select: {
-            id: true,
-            name: true,
-            photo: true,
-            employeeId: true,
-            status: true,
-          },
+          select: { id: true, name: true, photo: true, employeeId: true, status: true },
         },
       },
     });
@@ -474,25 +390,13 @@ router.get('/:id', async (req, res) => {
       where: { id: req.params.id },
       include: {
         assignedDriver: {
-          select: {
-            id: true,
-            name: true,
-            photo: true,
-            employeeId: true,
-            status: true,
-          },
+          select: { id: true, name: true, photo: true, employeeId: true, status: true },
         },
         handoffs: {
           orderBy: { checkOutTime: 'desc' },
           take: 10,
           include: {
-            driver: {
-              select: {
-                id: true,
-                name: true,
-                employeeId: true,
-              },
-            },
+            driver: { select: { id: true, name: true, employeeId: true } },
           },
         },
       },
@@ -542,9 +446,7 @@ router.put('/:id', async (req, res) => {
 // ──────────────────────────────────────────────────────────────
 router.delete('/:id', async (req, res) => {
   try {
-    await prisma.equipment.delete({
-      where: { id: req.params.id },
-    });
+    await prisma.equipment.delete({ where: { id: req.params.id } });
     res.json({ message: 'Equipment deleted successfully' });
   } catch (err) {
     if (err.code === 'P2025') {

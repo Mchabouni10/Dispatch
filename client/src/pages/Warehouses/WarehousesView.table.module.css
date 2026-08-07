@@ -1,45 +1,23 @@
-/* WarehousesView.table — toolbar, view toggle, manifest table */
+/* WarehousesView.table.module.css — page-specific table extras only.
+   Shared toolbar/table/view-toggle styles composed from shared.module.css
+   for consistency across the app. Adjust the import path below if your folder
+   structure differs. */
 
 .toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   flex-wrap: wrap;
 }
 
-.searchBox {
-  position: relative;
-  display: flex;
-  align-items: center;
-  flex: 1;
-  min-width: 220px;
-  max-width: 380px;
-}
-.searchIcon {
-  position: absolute;
-  left: 13px;
-  font-size: 12px;
-  color: var(--text-muted);
-  pointer-events: none;
-}
+.searchBox { composes: searchWrap from '../../styles/shared.module.css'; }
+.searchIcon { composes: searchIcon from '../../styles/shared.module.css'; }
 .searchInput {
-  width: 100%;
-  padding: 10px 34px 10px 36px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  color: var(--text-primary);
-  font-size: 13.5px;
-  transition: var(--transition);
+  composes: searchInput from '../../styles/shared.module.css';
+  padding-right: 34px; /* room for the clear (×) button */
 }
-.searchInput:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(79,142,247,0.1);
-}
-.searchInput::placeholder { color: var(--text-muted); }
 .searchClear {
   position: absolute;
   right: 8px;
@@ -62,118 +40,32 @@
 }
 
 /* View toggle — matches Airlines / Equipment / Drivers */
-.viewToggle {
-  display: inline-flex;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 3px;
-  gap: 2px;
-  flex-shrink: 0;
-}
-.toggleBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 7px 14px;
-  border-radius: calc(var(--radius-md) - 2px);
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-.toggleBtn:hover {
-  color: var(--text-primary);
-  background: rgba(255,255,255,0.05);
-}
-.toggleBtnActive {
-  background: var(--accent);
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(79,142,247,0.35);
-}
-.toggleBtnActive:hover {
-  background: var(--accent);
-  color: #fff;
-}
+.viewToggle { composes: viewToggle from '../../styles/shared.module.css'; }
+.toggleBtn { composes: toggleBtn from '../../styles/shared.module.css'; }
+.toggleBtnActive { composes: toggleBtnActive from '../../styles/shared.module.css'; }
+.toggleLabel { composes: toggleLabel from '../../styles/shared.module.css'; }
 
 /* Table */
-.tableWrap {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-}
-.tableScroll {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  min-width: 720px;
-}
-
-.table thead {
-  background: rgba(255,255,255,0.03);
-  border-bottom: 1px solid var(--border);
-}
-.table th {
-  padding: 11px 14px;
-  text-align: left;
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.45px;
-  white-space: nowrap;
-}
-.table th:first-child { padding-left: 16px; }
-.table th:last-child { padding-right: 16px; text-align: right; }
+.tableWrap { composes: tableWrap from '../../styles/shared.module.css'; }
+.tableScroll { composes: tableScroll from '../../styles/shared.module.css'; }
+.table { composes: table from '../../styles/shared.module.css'; }
 
 .thSortable { cursor: pointer; user-select: none; }
 .thSortable:hover { color: var(--text-primary); }
 .thSortable span { margin-right: 6px; }
 .sortIcon { font-size: 9px; opacity: 0.6; }
-.thExpand { width: 36px; }
+.thExpand { composes: thExpand from '../../styles/shared.module.css'; }
 .thActions { text-align: right; }
 
-.table tbody tr {
-  border-bottom: 1px solid var(--border);
-  transition: background 0.14s ease;
-}
-.table tbody tr:last-child { border-bottom: none; }
-
-.tr { cursor: pointer; }
-.tr:hover td { background: rgba(255,255,255,0.03); }
+.tr { composes: tr from '../../styles/shared.module.css'; }
+.tr:hover td { background: rgba(255, 255, 255, 0.03); }
 .tr24 td:first-child { box-shadow: inset 3px 0 0 var(--success); }
-.trOpen td { background: rgba(79,142,247,0.06); }
+.trOpen { composes: trOpen from '../../styles/shared.module.css'; }
 
-.table td {
-  padding: 11px 14px;
-  vertical-align: middle;
-  color: var(--text-primary);
-}
-.table td:first-child { padding-left: 16px; }
-.table td:last-child { padding-right: 16px; }
+.tdExpand { composes: tdExpand from '../../styles/shared.module.css'; }
+.expandChevron { composes: expandChevron from '../../styles/shared.module.css'; }
 
-.tdExpand { width: 36px; }
-.expandChevron {
-  font-size: 10px;
-  color: var(--text-muted);
-  transition: transform 0.2s ease;
-}
-.trOpen .expandChevron {
-  transform: rotate(180deg);
-  color: var(--accent);
-}
-
+/* Warehouse-specific data cells — no direct equivalent in shared */
 .tName {
   display: flex;
   align-items: center;
@@ -193,7 +85,7 @@
   font-size: 9.5px;
   font-weight: 800;
   flex-shrink: 0;
-  border: 1px solid rgba(79,142,247,0.2);
+  border: 1px solid rgba(79, 142, 247, 0.2);
 }
 .tMuted { color: var(--text-secondary); font-size: 12.5px; }
 .tMono {
@@ -211,37 +103,12 @@
 }
 
 /* Expand accordion */
-.trExpandRow td { padding: 0; border: 0; }
-.tdExpandContent { background: rgba(255,255,255,0.02); }
-.expandPanel {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 0.25s ease;
-}
-.expandPanelOpen { grid-template-rows: 1fr; }
-.expandPanelInner {
-  overflow: hidden;
-  padding: 0 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-.expandPanelOpen .expandPanelInner {
-  padding: 14px 20px 16px 50px;
-}
-.expandItem {
-  display: flex;
-  align-items: flex-start;
-  gap: 24px;
-  font-size: 12.5px;
-  color: var(--text-secondary);
-}
-.expandItem svg {
-  color: var(--accent);
-  font-size: 11px;
-  margin-top: 2px;
-  flex-shrink: 0;
-}
+.trExpandRow { composes: trExpandRow from '../../styles/shared.module.css'; }
+.tdExpandContent { composes: tdExpandContent from '../../styles/shared.module.css'; }
+.expandPanel { composes: expandPanel from '../../styles/shared.module.css'; }
+.expandPanelOpen { composes: expandPanelOpen from '../../styles/shared.module.css'; }
+.expandPanelInner { composes: expandPanelInner from '../../styles/shared.module.css'; }
+
 .notesEmpty {
   font-size: 12px;
   color: var(--text-muted);
@@ -250,6 +117,5 @@
 }
 
 @media (max-width: 720px) {
-  .viewToggle .toggleLabel { display: none; }
   .toggleBtn { padding: 7px 10px; }
 }

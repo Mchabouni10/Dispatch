@@ -123,7 +123,7 @@ router.get('/', async (req, res) => {
       where: filter,
       include: {
         airline: {
-          select: { id: true, name: true, code: true, awbPrefix: true, defaultCutoffHours: true }
+          select: { id: true, name: true, code: true, awbPrefix: true, defaultCutoffHours: true, terminalAddress: true }
         },
         warehouse: {
           select: { id: true, name: true }
@@ -155,7 +155,7 @@ router.get('/:id', async (req, res) => {
       where: { id: req.params.id },
       include: {
         airline: {
-          select: { id: true, name: true, code: true, awbPrefix: true, defaultCutoffHours: true }
+          select: { id: true, name: true, code: true, awbPrefix: true, defaultCutoffHours: true, terminalAddress: true }
         },
         warehouse: {
           select: { id: true, name: true }
@@ -238,7 +238,7 @@ router.post('/', async (req, res) => {
       data: mapRelationIdsToConnect(createData),
       include: {
         airline: {
-          select: { id: true, name: true, code: true, awbPrefix: true, defaultCutoffHours: true }
+          select: { id: true, name: true, code: true, awbPrefix: true, defaultCutoffHours: true, terminalAddress: true }
         },
         warehouse: {
           select: { id: true, name: true }
@@ -321,7 +321,7 @@ router.put('/:id', async (req, res) => {
       data: mapRelationIdsToConnect(data),
       include: {
         airline: {
-          select: { id: true, name: true, code: true, awbPrefix: true, defaultCutoffHours: true }
+          select: { id: true, name: true, code: true, awbPrefix: true, defaultCutoffHours: true, terminalAddress: true }
         },
         warehouse: {
           select: { id: true, name: true }

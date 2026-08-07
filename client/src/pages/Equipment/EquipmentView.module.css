@@ -1,69 +1,24 @@
-/* ══════════════════════════════════════════════════════════════════════
-   EquipmentView – Card styles (next-level polish, consistent with Airlines)
-   ══════════════════════════════════════════════════════════════════════ */
+/* EquipmentView.module.css — page-specific styles only.
+   Shared UI (buttons, cards, status pills, meta tags, forms, search) composed
+   from shared.module.css for consistency across the app. Adjust the import
+   path below if your folder structure differs. */
 
 .page {
+  composes: page from '../../styles/shared.module.css';
   max-width: 1100px;
 }
+.header { composes: header from '../../styles/shared.module.css'; }
+.pageTitle { composes: pageTitle from '../../styles/shared.module.css'; }
+.pageSub { composes: pageSub from '../../styles/shared.module.css'; }
+.headerMeta { composes: headerMeta from '../../styles/shared.module.css'; }
+.addBtn { composes: addBtn from '../../styles/shared.module.css'; }
 
-.header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 24px;
-}
-
-.pageTitle {
-  font-size: 26px;
-  font-weight: 800;
-  color: var(--text-primary);
-  letter-spacing: -0.5px;
-}
-
-.pageSub {
-  color: var(--text-secondary);
-  font-size: 13px;
-  margin-top: 4px;
-}
-
-.headerMeta {
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
-.addBtn {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  padding: 12px 24px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-  color: white;
-  border-radius: var(--radius-md);
-  font-size: 13.5px;
-  font-weight: 600;
-  transition: var(--transition);
-  box-shadow: 0 4px 12px rgba(79, 142, 247, 0.3);
-  border: none;
-  cursor: pointer;
-}
-
-.addBtn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(79, 142, 247, 0.4);
-}
-
-/* ── Tabs ── */
-.tabs {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 22px;
-  flex-wrap: wrap;
-}
-
+/* ── Category tabs — Equipment-only ── */
+.tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
 .tab {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 8px;
   padding: 10px 18px;
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -74,96 +29,64 @@
   transition: var(--transition);
   cursor: pointer;
 }
+.tab svg { font-size: 12px; opacity: 0.85; }
+.tab:hover { background: var(--bg-card-hover); color: var(--text-primary); border-color: var(--border-hover); }
+.activeTab { background: var(--info-bg); border-color: rgba(79, 142, 247, 0.35); color: var(--accent); }
+.tabCount { background: rgba(255, 255, 255, 0.08); border-radius: 100px; padding: 1px 8px; font-size: 11px; font-weight: 700; }
+.activeTab .tabCount { background: rgba(79, 142, 247, 0.18); }
 
-.tab svg {
-  font-size: 12px;
-  opacity: 0.85;
+/* ── Search + type filter toolbar ── */
+.toolbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+.searchWrap { composes: searchWrap from '../../styles/shared.module.css'; }
+.searchIcon { composes: searchIcon from '../../styles/shared.module.css'; }
+.searchInput {
+  composes: searchInput from '../../styles/shared.module.css';
+  padding-right: 34px; /* room for the clear (×) button */
 }
-
-.tab:hover {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
-  border-color: var(--border-hover);
-}
-
-.activeTab {
-  background: var(--info-bg);
-  border-color: rgba(79, 142, 247, 0.35);
-  color: var(--accent);
-}
-
-.tabCount {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 100px;
-  padding: 1px 8px;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.activeTab .tabCount {
-  background: rgba(79, 142, 247, 0.18);
-}
-
-.errorBanner {
-  background: var(--danger-bg);
-  border: 1px solid rgba(255, 71, 87, 0.3);
-  color: var(--danger);
-  padding: 20px 24px;
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  margin-bottom: 24px;
-}
-
-.loading {
-  text-align: center;
-  padding: 60px;
-  color: var(--text-secondary);
-  font-size: 14px;
-}
-
-.empty {
+.searchClear {
+  position: absolute;
+  right: 8px;
+  width: 22px;
+  height: 22px;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 24px;
-  padding: 64px 24px;
-  text-align: center;
-  color: var(--text-secondary);
-  font-size: 13px;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-lg);
-  grid-column: 1 / -1;
-}
-
-.empty svg {
-  font-size: 26px;
   color: var(--text-muted);
-  margin-bottom: 4px;
+  border-radius: 50%;
+  font-size: 11px;
+  transition: var(--transition);
+  border: none;
+  background: transparent;
+  cursor: pointer;
 }
+.searchClear:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+.filterSelect { composes: filterSelect from '../../styles/shared.module.css'; }
+.filterSelect option { background: var(--select-option-bg); color: var(--select-option-color); }
+.clearFiltersBtn {
+  padding: 9px 14px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.clearFiltersBtn:hover { border-color: var(--border-hover); color: var(--text-primary); }
 
-.empty strong {
-  color: var(--text-primary);
-  font-size: 14.5px;
-}
+.errorBanner { composes: errorBanner from '../../styles/shared.module.css'; }
+.loading { composes: loading from '../../styles/shared.module.css'; }
+
+.empty { composes: empty from '../../styles/shared.module.css'; }
+.empty svg { color: var(--text-muted); font-size: 26px; margin-bottom: 4px; }
+.empty strong { color: var(--text-primary); font-size: 14.5px; }
 
 /* ══════════════════════════════════════════════════════════════════════
    GRID / CARDS – elevated, status-aware
    ══════════════════════════════════════════════════════════════════════ */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 24px;
-}
-
-.card {
-  position: relative;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-}
+.grid { composes: grid from '../../styles/shared.module.css'; }
+.card { composes: card from '../../styles/shared.module.css'; }
 
 .card::before {
   content: "";
@@ -175,33 +98,16 @@
   z-index: 1;
 }
 
-.cardIn::before {
-  background: linear-gradient(90deg, var(--success), rgba(46, 204, 113, 0.2));
-}
-
-.cardOut::before {
-  background: linear-gradient(90deg, var(--danger), rgba(255, 71, 87, 0.2));
-}
-
-.cardAssigned::before {
-  background: linear-gradient(90deg, var(--accent-cyan), rgba(0, 212, 255, 0.25));
-}
-
-.cardCooldown::before {
-  background: linear-gradient(90deg, var(--warning), rgba(255, 179, 71, 0.25));
-}
-
-.card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
-  border-color: var(--border-hover);
-}
+.cardIn::before { background: linear-gradient(90deg, var(--success), rgba(46, 204, 113, 0.2)); }
+.cardOut::before { background: linear-gradient(90deg, var(--danger), rgba(255, 71, 87, 0.2)); }
+.cardAssigned::before { background: linear-gradient(90deg, var(--accent-cyan), rgba(0, 212, 255, 0.25)); }
+.cardCooldown::before { background: linear-gradient(90deg, var(--warning), rgba(255, 179, 71, 0.25)); }
 
 /* Header */
 .cardHeader {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 14px;
   padding: 24px;
   border-bottom: 1px solid var(--border);
   background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
@@ -240,6 +146,28 @@
   border: 1px solid rgba(0, 212, 255, 0.2);
 }
 
+/* Type short-code badge */
+.typeBadge {
+  position: absolute;
+  bottom: -4px;
+  left: -4px;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--bg-primary, #0a1220);
+  color: var(--text-primary);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--bg-card);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+  z-index: 2;
+}
+
 .coldBadge {
   position: absolute;
   bottom: -3px;
@@ -257,10 +185,7 @@
   box-shadow: 0 2px 6px rgba(0, 212, 255, 0.4);
 }
 
-.unitInfo {
-  flex: 1;
-  min-width: 0;
-}
+.unitInfo { flex: 1; min-width: 0; }
 
 .unitNumber {
   font-size: 15.5px;
@@ -279,69 +204,19 @@
   text-overflow: ellipsis;
 }
 
-.cardActions {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.editBtn,
-.deleteBtn {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  transition: var(--transition);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.editBtn:hover {
-  background: var(--info-bg);
-  border-color: var(--accent);
-  color: var(--accent);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(79, 142, 247, 0.25);
-}
-
-.deleteBtn:hover {
-  background: var(--danger-bg);
-  border-color: var(--danger);
-  color: var(--danger);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255, 71, 87, 0.25);
-}
+.cardActions { composes: cardActions from '../../styles/shared.module.css'; }
+.editBtn { composes: editBtn from '../../styles/shared.module.css'; }
+.deleteBtn { composes: deleteBtn from '../../styles/shared.module.css'; }
 
 /* Body */
-.cardBody {
-  padding: 13px 16px 15px;
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
+.cardBody { padding: 13px 16px 15px; display: flex; flex-direction: column; gap: 9px; }
+.statusRow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 
-.statusRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-
+/* Status pill keeps shared's base but adds the left status dot */
 .statusPill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  composes: statusPill from '../../styles/shared.module.css';
   padding: 3px 10px 3px 8px;
-  border-radius: 100px;
-  font-size: 11px;
-  font-weight: 600;
 }
-
 .statusPill::before {
   content: "";
   width: 6px;
@@ -349,25 +224,17 @@
   border-radius: 50%;
   flex-shrink: 0;
 }
-
 .statusIn {
-  background: rgba(46, 204, 113, 0.12);
-  color: var(--success);
-  border: 1px solid rgba(46, 204, 113, 0.3);
+  composes: statusIn from '../../styles/shared.module.css';
 }
-
 .statusIn::before {
   background: var(--success);
   box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.55);
   animation: pulseStatus 1.8s ease-in-out infinite;
 }
-
 .statusOut {
-  background: var(--danger-bg);
-  color: var(--danger);
-  border: 1px solid rgba(255, 71, 87, 0.3);
+  composes: statusOut from '../../styles/shared.module.css';
 }
-
 .statusOut::before {
   background: var(--danger);
   box-shadow: 0 0 6px rgba(255, 71, 87, 0.5);
@@ -379,23 +246,7 @@
   100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
 }
 
-.metaTag {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border-radius: 100px;
-  font-size: 10.5px;
-  font-weight: 500;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-}
-
-.metaTag svg {
-  font-size: 9.5px;
-  opacity: 0.8;
-}
+.metaTag { composes: metaTag from '../../styles/shared.module.css'; }
 
 .capacity {
   display: inline-flex;
@@ -411,13 +262,13 @@
   margin-left: auto;
 }
 
-/* Handoff / availability chips */
+/* Handoff / availability chips — Equipment-only, no shared equivalent */
 .handoffChip {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 24px;
-  padding: 20px 24px;
+  gap: 8px;
+  padding: 8px 12px;
   border-radius: var(--radius-sm);
   background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(0, 212, 255, 0.04));
   border: 1px solid rgba(0, 212, 255, 0.28);
@@ -426,25 +277,9 @@
   font-weight: 600;
 }
 
-.handoffChip svg {
-  font-size: 11px;
-}
-
-.handoffLabel {
-  text-transform: uppercase;
-  letter-spacing: 0.35px;
-  font-size: 10px;
-  opacity: 0.9;
-}
-
-.handoffDriver {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--text-primary);
-  font-weight: 600;
-  font-size: 12.5px;
-}
+.handoffChip svg { font-size: 11px; }
+.handoffLabel { text-transform: uppercase; letter-spacing: 0.35px; font-size: 10px; opacity: 0.9; }
+.handoffDriver { display: inline-flex; align-items: center; gap: 5px; color: var(--text-primary); font-weight: 600; font-size: 12.5px; }
 
 .cooldownChip {
   display: inline-flex;
@@ -486,23 +321,9 @@
   font-weight: 600;
 }
 
-.leaseChipWarn {
-  border-color: rgba(255, 179, 71, 0.4);
-}
-
-.leaseChipDate {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-left: auto;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.leaseChipWarn .leaseChipDate {
-  color: var(--warning);
-  font-weight: 600;
-}
+.leaseChipWarn { border-color: rgba(255, 179, 71, 0.4); }
+.leaseChipDate { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; color: var(--text-secondary); font-weight: 500; }
+.leaseChipWarn .leaseChipDate { color: var(--warning); font-weight: 600; }
 
 .oosReason {
   display: flex;
@@ -517,202 +338,34 @@
   margin: 0;
 }
 
-.complianceRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.complianceTag {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border-radius: 100px;
-  font-size: 10.5px;
-  font-weight: 500;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  transition: border-color 0.15s ease;
-}
-
-.expiringSoon {
-  background: rgba(255, 193, 7, 0.12);
-  border-color: rgba(255, 193, 7, 0.4);
-  color: var(--warning);
-}
-
-.expired {
-  background: var(--danger-bg);
-  border-color: rgba(255, 71, 87, 0.4);
-  color: var(--danger);
-}
+.complianceRow { display: flex; flex-wrap: wrap; gap: 6px; }
+.complianceTag { composes: complianceTag from '../../styles/shared.module.css'; }
+.expiringSoon { composes: expiringSoon from '../../styles/shared.module.css'; }
+.expired { composes: expired from '../../styles/shared.module.css'; }
 
 .notes {
-  font-size: 11.5px;
-  color: var(--text-muted);
-  font-style: italic;
+  composes: notes from '../../styles/shared.module.css';
   padding-left: 10px;
   border-left: 2px solid var(--border);
-  line-height: 1.5;
-  margin: 0;
 }
 
 /* ══════════════════════════════════════════════════════════════════════
    FORM
    ══════════════════════════════════════════════════════════════════════ */
-.form {
-  display: flex;
-  flex-direction: column;
-}
-
-.formGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  margin-bottom: 24px;
-}
-
-.fullWidth {
-  grid-column: 1 / -1;
-}
-
-.formGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-
-.sectionTitle {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 11.5px;
-  font-weight: 700;
-  color: var(--accent);
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  border-top: 1px solid var(--border);
-  padding-top: 14px;
-  margin-top: 2px;
-}
-
-.sectionTitle svg {
-  font-size: 11px;
-}
-
+.form { composes: form from '../../styles/shared.module.css'; }
+.formGrid { composes: formGrid from '../../styles/shared.module.css'; }
+.fullWidth { composes: fullWidth from '../../styles/shared.module.css'; }
+.formGroup { composes: formGroup from '../../styles/shared.module.css'; }
+.label { composes: label from '../../styles/shared.module.css'; }
+.sectionTitle { composes: sectionTitle from '../../styles/shared.module.css'; }
 .input {
-  padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  color: var(--text-primary);
-  font-size: 13.5px;
-  transition: var(--transition);
+  composes: input from '../../styles/shared.module.css';
 }
-
-.input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(79, 142, 247, 0.1);
-}
-
-.input::placeholder {
-  color: var(--text-muted);
-}
-
-select.input {
-  cursor: pointer;
-}
-
-select.input option {
-  background: #111c33;
-}
-
-.formError {
-  background: var(--danger-bg);
-  border: 1px solid rgba(255, 71, 87, 0.3);
-  color: var(--danger);
-  padding: 10px 14px;
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  margin-bottom: 24px;
-}
-
-.formActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 4px;
-}
-
-.cancelBtn {
-  padding: 12px 24px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
-  font-size: 13.5px;
-  font-weight: 500;
-  transition: var(--transition);
-  cursor: pointer;
-}
-
-.cancelBtn:hover {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
-}
-
-.saveBtn {
-  padding: 10px 24px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-  color: white;
-  border-radius: var(--radius-md);
-  font-size: 13.5px;
-  font-weight: 600;
-  transition: var(--transition);
-  box-shadow: 0 4px 12px rgba(79, 142, 247, 0.3);
-  border: none;
-  cursor: pointer;
-}
-
-.saveBtn:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-
-.saveBtn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.deleteConfirmBtn {
-  padding: 10px 24px;
-  background: linear-gradient(135deg, var(--danger), #cc2233);
-  color: white;
-  border-radius: var(--radius-md);
-  font-size: 13.5px;
-  font-weight: 600;
-  transition: var(--transition);
-  border: none;
-  cursor: pointer;
-}
-
-.deleteConfirmBtn:hover {
-  transform: translateY(-1px);
-}
-
-.confirmText {
-  color: var(--text-secondary);
-  font-size: 14px;
-  margin-bottom: 24px;
-  line-height: 1.6;
-}
+select.input { cursor: pointer; }
+select.input option { background: var(--select-option-bg); color: var(--select-option-color); }
+.formError { composes: formError from '../../styles/shared.module.css'; }
+.formActions { composes: formActions from '../../styles/shared.module.css'; }
+.cancelBtn { composes: cancelBtn from '../../styles/shared.module.css'; }
+.saveBtn { composes: saveBtn from '../../styles/shared.module.css'; }
+.deleteConfirmBtn { composes: deleteConfirmBtn from '../../styles/shared.module.css'; }
+.confirmText { composes: confirmText from '../../styles/shared.module.css'; }

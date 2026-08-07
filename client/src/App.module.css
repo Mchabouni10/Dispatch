@@ -1,6 +1,11 @@
 .app {
   display: flex;
   min-height: 100vh;
+  flex-direction: column;
+}
+
+.mobileHeader {
+  display: none;
 }
 
 .main {
@@ -12,8 +17,60 @@
 }
 
 @media (max-width: 768px) {
+  .app {
+    flex-direction: column;
+  }
+
+  .mobileHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    padding: 0 16px;
+    background: var(--sidebar-bg);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 99;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .hamburgerBtn,
+  .mobileThemeBtn {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    cursor: pointer;
+  }
+
+  .mobileBrand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-primary);
+  }
+
+  .mobileLogo {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    object-fit: cover;
+  }
+
   .main {
     margin-left: 0;
-    padding: 16px 16px 24px;
+    padding: 14px 12px 24px;
+    min-height: calc(100vh - 56px);
   }
 }
+

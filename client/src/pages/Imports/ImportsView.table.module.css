@@ -1,76 +1,43 @@
-/* Imports – Table + View Toggle + Expand */
+/* ImportsView.table.module.css — page-specific table extras only.
+   Shared table shell / view-toggle / expand-panel styles composed from
+   shared.module.css for consistency across the app. Adjust the import path
+   below if your folder structure differs. */
 
 .tableWrap {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  composes: tableWrap from '../../styles/shared.module.css';
   margin-bottom: 24px;
 }
-.tableScroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.tableScroll { composes: tableScroll from '../../styles/shared.module.css'; }
 .table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  min-width: 960px;
+  composes: table from '../../styles/shared.module.css';
+  min-width: 960px; /* Imports has more columns than the base table */
 }
-.table thead {
-  background: rgba(255,255,255,0.03);
-  border-bottom: 1px solid var(--border);
-}
-.table th {
-  padding: 11px 12px;
-  text-align: left;
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.45px;
-  white-space: nowrap;
-}
-.table th:first-child { padding-left: 12px; }
-.table th:last-child { padding-right: 16px; text-align: right; }
-.thExpand { width: 36px; }
+.thExpand { composes: thExpand from '../../styles/shared.module.css'; }
+.tdExpand { composes: tdExpand from '../../styles/shared.module.css'; }
 
-.table tbody tr {
-  border-bottom: 1px solid var(--border);
-  transition: background 0.14s ease;
-}
-.table tbody tr:last-child { border-bottom: none; }
-.tr { cursor: pointer; }
-.tr:hover td { background: rgba(255,255,255,0.03); }
+.tr { composes: tr from '../../styles/shared.module.css'; }
 .rowOverdue td { background: rgba(255,71,87,0.04); }
-.trOpen td { background: rgba(79,142,247,0.06); }
+.trOpen { composes: trOpen from '../../styles/shared.module.css'; }
 
-.table td {
-  padding: 11px 12px;
-  vertical-align: middle;
-  color: var(--text-primary);
-}
-.table td:first-child { padding-left: 12px; }
-.table td:last-child { padding-right: 16px; }
+.expandChevron { composes: expandChevron from '../../styles/shared.module.css'; }
 
-.tdExpand { width: 36px; }
-.expandChevron {
-  font-size: 10px;
-  color: var(--text-muted);
-  transition: transform 0.2s ease;
-}
-.trOpen .expandChevron {
-  transform: rotate(180deg);
-  color: var(--accent);
-}
-
+/* ── AWB cell — kept on a single line regardless of column width ── */
 .awb {
   font-family: ui-monospace, monospace;
   font-weight: 800;
   font-size: 13.5px;
   color: var(--accent-cyan);
   letter-spacing: 0.3px;
+  white-space: nowrap;
 }
-.subId { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-.airlineCell { display: flex; align-items: center; gap: 7px; font-size: 12.5px; }
+.subId {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+.airlineCell { display: flex; align-items: center; gap: 7px; font-size: 12.5px; white-space: nowrap; }
 .airlinePip { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .cargo { font-size: 12.5px; white-space: nowrap; }
 .cargo strong { font-weight: 700; color: var(--text-primary); }
@@ -84,133 +51,48 @@
   padding: 2px 8px; border-radius: 999px;
   font-size: 10px; font-weight: 700; white-space: nowrap;
 }
-.badgeGdp {
-  background: rgba(0,212,255,0.12);
+.badgeGdp { background: rgba(0,212,255,0.12); color: var(--accent-cyan); border: 1px solid rgba(0,212,255,0.28); }
+.badgeFee { background: rgba(255,71,87,0.12); color: var(--danger); border: 1px solid rgba(255,71,87,0.28); }
+.badgeOk { background: rgba(46,204,113,0.12); color: var(--success); border: 1px solid rgba(46,204,113,0.28); }
+
+.actions { composes: actions from '../../styles/shared.module.css'; }
+.actionBtn { composes: actionBtn from '../../styles/shared.module.css'; }
+.editBtn { composes: actionEdit from '../../styles/shared.module.css'; }
+.deleteBtn { composes: actionDelete from '../../styles/shared.module.css'; }
+.printBtn {
+  composes: actionBtn from '../../styles/shared.module.css';
   color: var(--accent-cyan);
-  border: 1px solid rgba(0,212,255,0.28);
 }
-.badgeFee {
-  background: rgba(255,71,87,0.12);
-  color: var(--danger);
-  border: 1px solid rgba(255,71,87,0.28);
-}
-.badgeOk {
-  background: rgba(46,204,113,0.12);
-  color: var(--success);
-  border: 1px solid rgba(46,204,113,0.28);
+.printBtn:hover {
+  color: var(--accent-cyan);
+  background: rgba(0, 212, 255, 0.12);
 }
 
-.actions { display: flex; gap: 5px; justify-content: flex-end; }
-.actionBtn {
-  width: 28px; height: 28px; border-radius: 6px;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 11.5px; border: 1px solid transparent;
-  cursor: pointer; transition: all 0.14s ease; background: transparent;
-}
-.editBtn {
-  background: var(--info-bg);
-  border-color: rgba(79,142,247,0.28);
-  color: var(--accent);
-}
-.editBtn:hover { background: var(--accent); color: #fff; transform: translateY(-1px); }
-.deleteBtn {
-  background: var(--danger-bg);
-  border-color: rgba(255,71,87,0.28);
-  color: var(--danger);
-}
-.deleteBtn:hover { background: var(--danger); color: #fff; transform: translateY(-1px); }
-
-.emptyRow td {
-  text-align: center; padding: 48px 16px;
-  color: var(--text-secondary); font-size: 13.5px;
-}
+.emptyRow { composes: emptyRow from '../../styles/shared.module.css'; }
 
 /* Expand panel */
-.trExpandRow td { padding: 0; border: 0; }
-.tdExpandContent { background: rgba(255,255,255,0.02); }
-.expandPanel {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 0.25s ease;
-}
-.expandPanelOpen { grid-template-rows: 1fr; }
-.expandPanelInner {
-  overflow: hidden;
-  padding: 0 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-.expandPanelOpen .expandPanelInner {
-  padding: 12px 16px 14px 48px;
-}
-.expandGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 10px 16px;
-}
-.expandItem {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.expandLabel {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  color: var(--text-muted);
-}
-.expandValue {
-  font-size: 12.5px;
-  color: var(--text-primary);
-  font-weight: 500;
-}
-.expandNotes {
-  font-size: 12px;
-  color: var(--text-muted);
-  font-style: italic;
-  margin: 0;
-}
+.trExpandRow { composes: trExpandRow from '../../styles/shared.module.css'; }
+.tdExpandContent { composes: tdExpandContent from '../../styles/shared.module.css'; }
+.expandPanel { composes: expandPanel from '../../styles/shared.module.css'; }
+.expandPanelOpen { composes: expandPanelOpen from '../../styles/shared.module.css'; }
+.expandPanelInner { composes: expandPanelInner from '../../styles/shared.module.css'; }
+.expandGrid { composes: expandGrid from '../../styles/shared.module.css'; }
+.expandItem { composes: expandItem from '../../styles/shared.module.css'; }
+.expandLabel { composes: expandLabel from '../../styles/shared.module.css'; }
+.expandValue { composes: expandValue from '../../styles/shared.module.css'; }
+.expandNotes { composes: expandNotes from '../../styles/shared.module.css'; }
 
 /* View Toggle */
-.viewToggle {
-  display: inline-flex;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 3px;
-  gap: 2px;
-}
-.toggleBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 7px 12px;
-  border-radius: calc(var(--radius-md) - 2px);
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-.toggleBtn:hover {
-  color: var(--text-primary);
-  background: rgba(255,255,255,0.05);
-}
-.toggleBtnActive {
-  background: var(--accent);
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(79,142,247,0.35);
-}
-.toggleBtnActive:hover { background: var(--accent); color: #fff; }
+.viewToggle { composes: viewToggle from '../../styles/shared.module.css'; }
+.toggleBtn { composes: toggleBtn from '../../styles/shared.module.css'; }
+.toggleBtnActive { composes: toggleBtnActive from '../../styles/shared.module.css'; }
+.toggleLabel { composes: toggleLabel from '../../styles/shared.module.css'; }
 
 @media (max-width: 720px) {
-  .viewToggle .toggleLabel { display: none; }
   .toggleBtn { padding: 7px 10px; }
 }
+
+
+
+
 

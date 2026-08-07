@@ -11,7 +11,7 @@
   padding: 42px;
   border: 1px solid var(--border-hover);
   border-radius: var(--radius-lg);
-  background: rgba(13, 21, 38, 0.86);
+  background: var(--glass-bg);
   box-shadow: var(--shadow-lg);
 }
 

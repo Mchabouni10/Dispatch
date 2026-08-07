@@ -35,6 +35,17 @@ model Trip {
   // than one trip — an unsplit shipment on a single trip is assumed to
   // carry that shipment's full pieces/weight.
   shipmentSplits TripShipmentSplit[]
+
+  // POD / signature capture when the run is finished
+  handoff TripHandoff?
+
+  // Per-shipment problems at handoff (short / rejected / damaged)
+  exceptions ShipmentException[]
+
+  // Equipment handoffs created specifically for this trip
+  // (reason DISPATCH + tripId set). Morning handoffs stay tripId: null.
+  // Used by releaseTripCreatedCheckouts so cancel only frees dispatch checkouts.
+  equipmentHandoffs EquipmentHandoff[]
 }
 
 // One AWB permit is sometimes too big for one trailer. This table records
