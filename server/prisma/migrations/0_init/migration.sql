@@ -140,6 +140,7 @@ CREATE TABLE "EquipmentHandoff" (
     "replacedEquipmentId" TEXT,
     "trailerId" TEXT,
     "previousTrailerId" TEXT,
+    "tripId" TEXT,
     "checkOutTime" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "returnTime" TIMESTAMP(3),
     "shiftStartTime" TIMESTAMP(3),
@@ -196,6 +197,7 @@ CREATE TABLE "Shipment" (
     "deliveryAppointmentAt" TIMESTAMP(3),
     "airlineId" TEXT,
     "warehouseId" TEXT,
+    "parentShipmentId" TEXT,
 
     CONSTRAINT "Shipment_pkey" PRIMARY KEY ("id")
 );
@@ -260,6 +262,36 @@ CREATE TABLE "TripShipmentSplit" (
 );
 
 -- CreateTable
+CREATE TABLE "TripHandoff" (
+    "id" TEXT NOT NULL,
+    "tripId" TEXT NOT NULL,
+    "finishTime" TIMESTAMP(3) NOT NULL,
+    "podImageUrl" TEXT,
+    "signatureImageUrl" TEXT,
+    "receivedByName" TEXT,
+    "notes" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "TripHandoff_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ShipmentException" (
+    "id" TEXT NOT NULL,
+    "tripId" TEXT NOT NULL,
+    "shipmentId" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "piecesAffected" INTEGER,
+    "reason" TEXT,
+    "photoUrl" TEXT,
+    "resolution" TEXT,
+    "resolvedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ShipmentException_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -286,6 +318,14 @@ CREATE TABLE "Warehouse" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Warehouse_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TripSequence" (
+    "id" INTEGER NOT NULL DEFAULT 1,
+    "lastUsed" INTEGER NOT NULL DEFAULT 0,
+
+    CONSTRAINT "TripSequence_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -325,10 +365,28 @@ CREATE INDEX "EquipmentHandoff_isActive_idx" ON "EquipmentHandoff"("isActive");
 CREATE INDEX "EquipmentHandoff_action_idx" ON "EquipmentHandoff"("action");
 
 -- CreateIndex
+CREATE INDEX "EquipmentHandoff_tripId_idx" ON "EquipmentHandoff"("tripId");
+
+-- CreateIndex
+CREATE INDEX "Shipment_parentShipmentId_idx" ON "Shipment"("parentShipmentId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Trip_tripNumber_key" ON "Trip"("tripNumber");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "TripShipmentSplit_tripId_shipmentId_key" ON "TripShipmentSplit"("tripId", "shipmentId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TripHandoff_tripId_key" ON "TripHandoff"("tripId");
+
+-- CreateIndex
+CREATE INDEX "ShipmentException_tripId_idx" ON "ShipmentException"("tripId");
+
+-- CreateIndex
+CREATE INDEX "ShipmentException_shipmentId_idx" ON "ShipmentException"("shipmentId");
+
+-- CreateIndex
+CREATE INDEX "ShipmentException_type_idx" ON "ShipmentException"("type");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
@@ -358,10 +416,16 @@ ALTER TABLE "EquipmentHandoff" ADD CONSTRAINT "EquipmentHandoff_replacedEquipmen
 ALTER TABLE "EquipmentHandoff" ADD CONSTRAINT "EquipmentHandoff_trailerId_fkey" FOREIGN KEY ("trailerId") REFERENCES "Equipment"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "EquipmentHandoff" ADD CONSTRAINT "EquipmentHandoff_tripId_fkey" FOREIGN KEY ("tripId") REFERENCES "Trip"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Shipment" ADD CONSTRAINT "Shipment_airlineId_fkey" FOREIGN KEY ("airlineId") REFERENCES "Airline"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Shipment" ADD CONSTRAINT "Shipment_warehouseId_fkey" FOREIGN KEY ("warehouseId") REFERENCES "Warehouse"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Shipment" ADD CONSTRAINT "Shipment_parentShipmentId_fkey" FOREIGN KEY ("parentShipmentId") REFERENCES "Shipment"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ShipmentGroupShipment" ADD CONSTRAINT "ShipmentGroupShipment_shipmentId_fkey" FOREIGN KEY ("shipmentId") REFERENCES "Shipment"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -386,6 +450,15 @@ ALTER TABLE "TripShipmentSplit" ADD CONSTRAINT "TripShipmentSplit_tripId_fkey" F
 
 -- AddForeignKey
 ALTER TABLE "TripShipmentSplit" ADD CONSTRAINT "TripShipmentSplit_shipmentId_fkey" FOREIGN KEY ("shipmentId") REFERENCES "Shipment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TripHandoff" ADD CONSTRAINT "TripHandoff_tripId_fkey" FOREIGN KEY ("tripId") REFERENCES "Trip"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ShipmentException" ADD CONSTRAINT "ShipmentException_tripId_fkey" FOREIGN KEY ("tripId") REFERENCES "Trip"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ShipmentException" ADD CONSTRAINT "ShipmentException_shipmentId_fkey" FOREIGN KEY ("shipmentId") REFERENCES "Shipment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "_ShipmentTrips" ADD CONSTRAINT "_ShipmentTrips_A_fkey" FOREIGN KEY ("A") REFERENCES "Shipment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
