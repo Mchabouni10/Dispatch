@@ -19,6 +19,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { getShipments, getTrips } from "../../api/api.js";
 import styles from "./AnalyticsView.module.css";
+import LiveClock from "../../styles/Liveclock.jsx"; // adjust path to match your folder layout
 
 const PERIODS = [
   { id: "7d", label: "7 days" },
@@ -443,17 +444,20 @@ export default function AnalyticsView() {
             complaints, audits, and driver evaluation.
           </p>
         </div>
-        <div className={styles.periodGroup}>
-          {PERIODS.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className={`${styles.periodBtn} ${period === p.id ? styles.periodBtnActive : ""}`}
-              onClick={() => setPeriod(p.id)}
-            >
-              {p.label}
-            </button>
-          ))}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <LiveClock />
+          <div className={styles.periodGroup}>
+            {PERIODS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className={`${styles.periodBtn} ${period === p.id ? styles.periodBtnActive : ""}`}
+                onClick={() => setPeriod(p.id)}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

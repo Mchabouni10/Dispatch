@@ -21,7 +21,6 @@ import {
   faCheck,
   faXmark,
   faHourglassHalf,
-  faCalendarAlt,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   getDrivers,
@@ -53,10 +52,9 @@ import {
   isScheduledToday,
   isPastShiftEnd,
   formatDuration,
-  formatDateHeader,
-  formatClock,
 } from "./handoffHelpers.js";
 import styles from "./HandoffView.module.css";
+import LiveClock from "../../styles/Liveclock.jsx"; // adjust path to match your folder layout
 
 const TYPE_ICONS = {
   Tractor: faTruckFront,
@@ -487,13 +485,7 @@ export default function HandoffView() {
         </div>
 
         <div className={styles.headerRight}>
-          <div className={styles.liveClock}>
-            <FontAwesomeIcon icon={faCalendarAlt} />
-            <div className={styles.clockText}>
-              <span className={styles.clockDate}>{formatDateHeader(now)}</span>
-              <span className={styles.clockTime}>{formatClock(now)}</span>
-            </div>
-          </div>
+          <LiveClock />
 
           {cooldownTrucks.length > 0 && (
             <div className={styles.cooldownSummary}>

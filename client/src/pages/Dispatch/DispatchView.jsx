@@ -26,6 +26,7 @@ import HandoffModal from "./components/HandoffModal/HandoffModal.jsx";
 import DeleteRunModal from "./components/DeleteRunModal/DeleteRunModal.jsx";
 import AddBackupDriverModal from "./components/AddBackupDriverModal/AddBackupDriverModal.jsx";
 import styles from "./DispatchView.module.css";
+import LiveClock from "../../styles/Liveclock.jsx"; // adjust path to match your folder layout
 
 export default function DispatchView() {
   const {
@@ -236,9 +237,12 @@ export default function DispatchView() {
             commitment.
           </p>
         </div>
-        <button className={styles.primaryButton} onClick={openBuildRun}>
-          <FontAwesomeIcon icon={faPlus} /> Build a run
-        </button>
+        <div className={styles.headerRight}>
+          <LiveClock />
+          <button className={styles.primaryButton} onClick={openBuildRun}>
+            <FontAwesomeIcon icon={faPlus} /> Build a run
+          </button>
+        </div>
       </div>
 
       {error && !modalOpen && !handoffTrip && (

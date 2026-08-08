@@ -25,6 +25,7 @@ import {
   getTrips,
 } from "../../api/api.js";
 import styles from "./CalendarView.module.css";
+import LiveClock from "../../styles/Liveclock.jsx"; // adjust path to match your folder layout
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = [
@@ -694,9 +695,12 @@ export default function CalendarView() {
             board.
           </p>
         </div>
-        <button type="button" className={styles.todayBtn} onClick={goToday}>
-          Today
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <LiveClock />
+          <button type="button" className={styles.todayBtn} onClick={goToday}>
+            Today
+          </button>
+        </div>
       </div>
 
       <section className={styles.brief}>

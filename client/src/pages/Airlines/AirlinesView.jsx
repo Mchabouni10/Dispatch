@@ -10,6 +10,7 @@ import Modal from '../../components/Modal/Modal.jsx';
 import TimePicker from '../../styles/TimePicker.jsx';
 import styles from './AirlinesView.module.css';
 import tableStyles from './AirlinesView.table.module.css';
+import LiveClock from '../../styles/Liveclock.jsx'; // adjust path to match your folder layout
 
 const INITIAL = {
   name: '', code: '', awbPrefix: '', terminalAddress: '', contactPhone: '',
@@ -349,6 +350,7 @@ export default function AirlinesView() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <LiveClock />
           <div className={tableStyles.viewToggle} role="group" aria-label="View mode">
             <button
               type="button"

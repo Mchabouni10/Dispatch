@@ -37,6 +37,7 @@ import {
 } from "../../api/api.js";
 import StatusBadge from "../../components/StatusBadge/StatusBadge.jsx";
 import styles from "./DashboardView.module.css";
+import LiveClock from "../../styles/Liveclock.jsx"; // adjust path to match your folder layout
 
 const SOCKET_URL =
   (typeof import.meta !== "undefined" && import.meta.env?.VITE_SOCKET_URL) ||
@@ -87,35 +88,6 @@ function awbLabel(shipment) {
   return awbs.length > 1
     ? `${awbs[0]} +${awbs.length - 1}`
     : awbs[0] || "AWB pending";
-}
-
-function LiveClock() {
-  const [now, setNow] = useState(new Date());
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  return (
-    <div className={styles.clock}>
-      <FontAwesomeIcon icon={faClock} className={styles.clockIcon} />
-      <div>
-        <div className={styles.clockTime}>
-          {now.toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          })}
-        </div>
-        <div className={styles.clockDate}>
-          {now.toLocaleDateString("en-US", {
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-          })}
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function CountdownChip({ hours }) {

@@ -332,8 +332,53 @@ router.patch('/:id/assign', async (req, res) => {
       if (!driver) {
         return res.status(404).json({ message: 'Driver not found' });
       }
+      const targetEquipment = await prisma.equipment.findUnique({ where: { id: req.params.id } });
+      if (!targetEquipment) {
+        return res.status(404).json({ message: 'Equipment not found' });
+      }
 
       await prisma.$transaction(async (tx) => {
+        // Guard against double-checkout: if this driver already holds a
+        // DIFFERENT unit in the same category (e.g. already has a tractor
+        // and is now being checked into another tractor), release the old
+        // one first. Without this, the previous unit's assignedDriverId is
+        // left dangling forever — the driver ends up "in use" on two units
+        // at once, which the stuck-assignment check never catches because
+        // the driver is still on shift and Available.
+        const existingSameCategory = await tx.equipment.findFirst({
+          where: {
+            assignedDriverId: driverId,
+            category: targetEquipment.category,
+            id: { not: req.params.id },
+          },
+        });
+        if (existingSameCategory) {
+          await releaseEquipment(tx, {
+            equipmentId: existingSameCategory.id,
+            cooldownMinutes: 0,
+            reason: reason || 'DISPATCH',
+            reasonNote: 'Auto-released — driver checked into a different unit without a formal return',
+          });
+        }
+
+        if (trailerId) {
+          const existingTrailer = await tx.equipment.findFirst({
+            where: {
+              assignedDriverId: driverId,
+              category: 'Trailer',
+              id: { not: trailerId },
+            },
+          });
+          if (existingTrailer) {
+            await releaseEquipment(tx, {
+              equipmentId: existingTrailer.id,
+              cooldownMinutes: 0,
+              reason: reason || 'DISPATCH',
+              reasonNote: 'Auto-released — driver checked into a different trailer without a formal return',
+            });
+          }
+        }
+
         await checkoutEquipment(tx, {
           equipmentId: req.params.id,
           driverId,

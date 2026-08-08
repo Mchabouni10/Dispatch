@@ -850,3 +850,49 @@ select.input option { background: var(--select-option-bg); color: var(--select-o
   .addBtn { width: 100%; justify-content: center; }
   .cancelBtn, .saveBtn, .deleteConfirmBtn { flex: 1; min-width: 120px; text-align: center; }
 }
+
+/* ── Live clock (shared across pages: Dashboard, Handoff, etc.) ────────────
+   Single source of truth for the header clock. Use <LiveClock /> from
+   '../shared/LiveClock.jsx', which already references these classnames.
+   Don't redefine .liveClock/.clockTime/etc. in a page-level module.css —
+   edit it here so every page stays in sync. ─────────────────────────────── */
+.liveClock {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: var(--panel-2, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+}
+
+.clockIcon {
+  color: var(--accent);
+  font-size: 15px;
+}
+
+.clockText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.clockTime {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.clockDate {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .liveClock { padding: 6px 10px; }
+  .clockTime { font-size: 13px; }
+  .clockDate { font-size: 10px; }
+}

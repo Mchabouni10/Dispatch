@@ -39,6 +39,7 @@ import {
   updateEquipment,
   deleteEquipment,
   getDrivers,
+  assignEquipment,
 } from "../../api/api.js";
 import Modal from "../../components/Modal/Modal.jsx";
 import DateTimePicker, { toLocalISO } from "../../styles/Datetimepicker.jsx";
@@ -47,7 +48,14 @@ import tableStyles from "./EquipmentView.table.module.css";
 
 const TYPE_GROUPS = {
   "Power Unit": ["Tractor", "Straight Truck", "Cube Truck", "Sprinter Van"],
-  Trailer: ["Dry Van", "Reefer", "Open Deck", "Flat Bed", "Low Boy", "Roller Bed"],
+  Trailer: [
+    "Dry Van",
+    "Reefer",
+    "Open Deck",
+    "Flat Bed",
+    "Low Boy",
+    "Roller Bed",
+  ],
 };
 const isTrailerType = (type) => TYPE_GROUPS.Trailer.includes(type);
 const pullsTrailer = (type) => type === "Tractor";
@@ -142,7 +150,8 @@ function minutesUntil(value) {
 function getAvailabilityKey(item, now) {
   if (item.status === "Out of Service") return "out_of_service";
   if (item.assignedDriverId) return "in_use";
-  if (item.availableAt && new Date(item.availableAt).getTime() > now) return "cooling";
+  if (item.availableAt && new Date(item.availableAt).getTime() > now)
+    return "cooling";
   if (item.status === "In Service") return "available";
   return "out_of_service";
 }
@@ -162,6 +171,7 @@ export default function EquipmentView() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [tick, setTick] = useState(0);
+  const [releasingId, setReleasingId] = useState(null);
   const [viewMode, setViewMode] = useState(() => {
     try {
       return localStorage.getItem(VIEW_KEY) || "cards";
@@ -259,9 +269,14 @@ export default function EquipmentView() {
         status: form.status,
         notes: form.notes || "",
       };
-      if (form.year && !isNaN(form.year) && form.year !== "") payload.year = Number(form.year);
+      if (form.year && !isNaN(form.year) && form.year !== "")
+        payload.year = Number(form.year);
       if (trailer) {
-        if (form.capacityLbs && !isNaN(form.capacityLbs) && form.capacityLbs !== "") {
+        if (
+          form.capacityLbs &&
+          !isNaN(form.capacityLbs) &&
+          form.capacityLbs !== ""
+        ) {
           payload.capacityLbs = Number(form.capacityLbs);
         }
         if (
@@ -276,23 +291,32 @@ export default function EquipmentView() {
         payload.outOfServiceReason = form.outOfServiceReason;
       }
       if (form.registrationExpiration) {
-        payload.registrationExpiration = new Date(form.registrationExpiration).toISOString();
+        payload.registrationExpiration = new Date(
+          form.registrationExpiration,
+        ).toISOString();
       }
       if (form.nextMaintenanceDue) {
-        payload.nextMaintenanceDue = new Date(form.nextMaintenanceDue).toISOString();
+        payload.nextMaintenanceDue = new Date(
+          form.nextMaintenanceDue,
+        ).toISOString();
       }
       payload.insuranceProvider = form.insuranceProvider || "";
       payload.insurancePolicyNumber = form.insurancePolicyNumber || "";
       if (form.insuranceExpiration) {
-        payload.insuranceExpiration = new Date(form.insuranceExpiration).toISOString();
+        payload.insuranceExpiration = new Date(
+          form.insuranceExpiration,
+        ).toISOString();
       }
       if (form.iftaIrpExpiration) {
-        payload.iftaIrpExpiration = new Date(form.iftaIrpExpiration).toISOString();
+        payload.iftaIrpExpiration = new Date(
+          form.iftaIrpExpiration,
+        ).toISOString();
       }
       payload.ownershipType = form.ownershipType;
       if (form.ownershipType !== "Owned") {
         payload.leaseCompany = form.leaseCompany || "";
-        if (form.leaseEndDate) payload.leaseEndDate = new Date(form.leaseEndDate).toISOString();
+        if (form.leaseEndDate)
+          payload.leaseEndDate = new Date(form.leaseEndDate).toISOString();
         if (
           form.monthlyPaymentAmount &&
           !isNaN(form.monthlyPaymentAmount) &&
@@ -328,6 +352,38 @@ export default function EquipmentView() {
     }
   };
 
+  // Force-release a "stuck" unit — one whose assigned driver has already
+  // gone Off Duty/Terminated/Absent/Vacation/Sick Leave and therefore no
+  // longer appears on the Handoff Board, so the normal return-equipment
+  // flow can never reach them. This calls the same release path the
+  // Handoff Board uses (closes the open EquipmentHandoff row + clears
+  // assignedDriverId) directly from here instead.
+  const handleForceRelease = async (item) => {
+    const driverName = resolveAssignedDriver(item)?.name || "the assigned driver";
+    if (
+      !window.confirm(
+        `Release ${item.unitNumber} from ${driverName}? This clears the assignment immediately with no cooldown.`,
+      )
+    ) {
+      return;
+    }
+    setReleasingId(item.id);
+    setError("");
+    try {
+      await assignEquipment(item.id, {
+        release: true,
+        cooldownMinutes: 0,
+        reason: "SHIFT_END",
+        reasonNote: "Force-released from Equipment page — driver no longer on shift",
+      });
+      await load();
+    } catch (err) {
+      setError(err.message || "Failed to release equipment");
+    } finally {
+      setReleasingId(null);
+    }
+  };
+
   const driverById = useMemo(() => {
     const map = {};
     drivers.forEach((d) => {
@@ -352,6 +408,30 @@ export default function EquipmentView() {
     return STUCK_DRIVER_STATUSES.has(d.status);
   };
 
+  // Units where the SAME driver is currently handed off on more than one
+  // unit of the SAME category at once (two tractors, or two trailers).
+  // A driver holding one Power Unit + one Trailer together is a normal
+  // rig pairing and is NOT flagged. This catches a different failure mode
+  // than isStuckAssignment: the driver is still on shift and "Available",
+  // so the off-duty check above never sees it — but an earlier checkout
+  // left a stale assignment on a unit they no longer actually have.
+  const duplicateAssignmentIds = useMemo(() => {
+    const byDriverCategory = new Map();
+    for (const e of equipment) {
+      if (!e.assignedDriverId) continue;
+      const key = `${e.assignedDriverId}|${e.category}`;
+      if (!byDriverCategory.has(key)) byDriverCategory.set(key, []);
+      byDriverCategory.get(key).push(e.id);
+    }
+    const dupes = new Set();
+    for (const ids of byDriverCategory.values()) {
+      if (ids.length > 1) ids.forEach((id) => dupes.add(id));
+    }
+    return dupes;
+  }, [equipment]);
+
+  const isDuplicateAssignment = (item) => duplicateAssignmentIds.has(item.id);
+
   const now = Date.now();
   void tick;
 
@@ -367,11 +447,11 @@ export default function EquipmentView() {
     for (const e of equipment) {
       const key = getAvailabilityKey(e, now);
       c[key] += 1;
-      if (isStuckAssignment(e)) c.stuck += 1;
+      if (isStuckAssignment(e) || isDuplicateAssignment(e)) c.stuck += 1;
     }
     return c;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- isStuck uses drivers via resolveAssignedDriver
-  }, [equipment, drivers, now]);
+  }, [equipment, drivers, now, duplicateAssignmentIds]);
 
   const counts = {
     All: equipment.length,
@@ -380,8 +460,12 @@ export default function EquipmentView() {
   };
 
   const filtered = useMemo(() => {
-    let list = tab === "All" ? [...equipment] : equipment.filter((e) => e.category === tab);
-    if (typeFilter !== "All") list = list.filter((e) => e.equipmentType === typeFilter);
+    let list =
+      tab === "All"
+        ? [...equipment]
+        : equipment.filter((e) => e.category === tab);
+    if (typeFilter !== "All")
+      list = list.filter((e) => e.equipmentType === typeFilter);
 
     if (availabilityFilter === "available") {
       list = list.filter((e) => getAvailabilityKey(e, now) === "available");
@@ -390,9 +474,11 @@ export default function EquipmentView() {
     } else if (availabilityFilter === "cooling") {
       list = list.filter((e) => getAvailabilityKey(e, now) === "cooling");
     } else if (availabilityFilter === "out_of_service") {
-      list = list.filter((e) => getAvailabilityKey(e, now) === "out_of_service");
+      list = list.filter(
+        (e) => getAvailabilityKey(e, now) === "out_of_service",
+      );
     } else if (availabilityFilter === "stuck") {
-      list = list.filter((e) => isStuckAssignment(e));
+      list = list.filter((e) => isStuckAssignment(e) || isDuplicateAssignment(e));
     }
 
     const q = search.trim().toLowerCase();
@@ -421,7 +507,8 @@ export default function EquipmentView() {
 
   const handleTypeFilterChange = (value) => {
     setTypeFilter(value);
-    if (value !== "All") setTab(isTrailerType(value) ? "Trailer" : "Power Unit");
+    if (value !== "All")
+      setTab(isTrailerType(value) ? "Trailer" : "Power Unit");
   };
   const handleTabChange = (t) => {
     setTab(t);
@@ -443,8 +530,13 @@ export default function EquipmentView() {
         ? minutesUntil(item.availableAt)
         : null;
     const isCooling = cooldownLeft != null && cooldownLeft > 0;
-    const stuck = isStuckAssignment(item);
-    return { isHandedOff, isCooling, cooldownLeft, stuck };
+    const offDuty = isStuckAssignment(item);
+    const duplicate = isDuplicateAssignment(item);
+    const stuck = offDuty || duplicate;
+    const stuckMessage = offDuty
+      ? "Stuck assignment — driver is not on shift."
+      : "Duplicate assignment — driver already holds another unit of this type.";
+    return { isHandedOff, isCooling, cooldownLeft, stuck, stuckMessage };
   };
 
   const ComplianceTags = ({ item }) => {
@@ -457,9 +549,16 @@ export default function EquipmentView() {
       if (days < 0) cls += ` ${tableStyles.compExpired}`;
       else if (days <= 30) cls += ` ${tableStyles.compWarn}`;
       tags.push(
-        <span key={label} className={cls} title={`${label}: ${expiryLabel(date)}`}>
+        <span
+          key={label}
+          className={cls}
+          title={`${label}: ${expiryLabel(date)}`}
+        >
           {(days < 0 || days <= 30) && (
-            <FontAwesomeIcon icon={faTriangleExclamation} style={{ fontSize: 8 }} />
+            <FontAwesomeIcon
+              icon={faTriangleExclamation}
+              style={{ fontSize: 8 }}
+            />
           )}
           {label}: {expiryLabel(date)}
         </span>,
@@ -493,7 +592,8 @@ export default function EquipmentView() {
           const iftaWarn = expiryClass(item.iftaIrpExpiration);
           const leaseWarn = expiryClass(item.leaseEndDate);
           const assigned = resolveAssignedDriver(item);
-          const { isHandedOff, isCooling, cooldownLeft, stuck } = getRowState(item);
+          const { isHandedOff, isCooling, cooldownLeft, stuck, stuckMessage } =
+            getRowState(item);
           return (
             <div
               key={item.id}
@@ -522,12 +622,18 @@ export default function EquipmentView() {
                     }
                   />
                   {TYPE_SHORT[item.equipmentType] && (
-                    <span className={styles.typeBadge} title={item.equipmentType}>
+                    <span
+                      className={styles.typeBadge}
+                      title={item.equipmentType}
+                    >
                       {TYPE_SHORT[item.equipmentType]}
                     </span>
                   )}
                   {item.equipmentType === "Reefer" && (
-                    <span className={styles.coldBadge} title="Temperature-controlled">
+                    <span
+                      className={styles.coldBadge}
+                      title="Temperature-controlled"
+                    >
                       <FontAwesomeIcon icon={faSnowflake} />
                     </span>
                   )}
@@ -560,7 +666,9 @@ export default function EquipmentView() {
                 <div className={styles.statusRow}>
                   <span
                     className={`${styles.statusPill} ${
-                      item.status === "In Service" ? styles.statusIn : styles.statusOut
+                      item.status === "In Service"
+                        ? styles.statusIn
+                        : styles.statusOut
                     }`}
                   >
                     {item.status}
@@ -578,18 +686,28 @@ export default function EquipmentView() {
                   {item.category === "Power Unit" && (
                     <span className={styles.metaTag}>
                       <FontAwesomeIcon
-                        icon={pullsTrailer(item.equipmentType) ? faLink : faLinkSlash}
+                        icon={
+                          pullsTrailer(item.equipmentType)
+                            ? faLink
+                            : faLinkSlash
+                        }
                       />
-                      {pullsTrailer(item.equipmentType) ? "Pulls trailer" : "Self-contained"}
+                      {pullsTrailer(item.equipmentType)
+                        ? "Pulls trailer"
+                        : "Self-contained"}
                     </span>
                   )}
                   {item.category === "Trailer" &&
                     (item.capacityLbs || item.palletPositions) && (
                       <span className={styles.capacity}>
                         <FontAwesomeIcon icon={faWeightHanging} />
-                        {item.capacityLbs ? `${item.capacityLbs.toLocaleString()} lb` : ""}
+                        {item.capacityLbs
+                          ? `${item.capacityLbs.toLocaleString()} lb`
+                          : ""}
                         {item.capacityLbs && item.palletPositions ? " · " : ""}
-                        {item.palletPositions ? `${item.palletPositions} positions` : ""}
+                        {item.palletPositions
+                          ? `${item.palletPositions} positions`
+                          : ""}
                       </span>
                     )}
                 </div>
@@ -602,19 +720,32 @@ export default function EquipmentView() {
                       <span className={styles.handoffDriver}>
                         <FontAwesomeIcon icon={faUser} />
                         {assigned.name}
-                        {assigned.employeeId ? ` · #${assigned.employeeId}` : ""}
+                        {assigned.employeeId
+                          ? ` · #${assigned.employeeId}`
+                          : ""}
                         {assigned.status ? ` · ${assigned.status}` : ""}
                       </span>
                     ) : (
-                      <span className={styles.handoffDriver}>Driver assigned</span>
+                      <span className={styles.handoffDriver}>
+                        Driver assigned
+                      </span>
                     )}
                   </div>
                 )}
 
                 {stuck && (
-                  <div className={styles.oosReason} title="Release via Handoff Board">
+                  <div className={styles.oosReason}>
                     <FontAwesomeIcon icon={faTriangleExclamation} />
-                    Stuck assignment — driver is not on shift. Release on Handoff Board.
+                    <span>{stuckMessage}</span>
+                    <button
+                      type="button"
+                      className={styles.releaseBtn}
+                      onClick={() => handleForceRelease(item)}
+                      disabled={releasingId === item.id}
+                    >
+                      <FontAwesomeIcon icon={faLinkSlash} />
+                      {releasingId === item.id ? "Releasing…" : "Release now"}
+                    </button>
                   </div>
                 )}
 
@@ -628,13 +759,12 @@ export default function EquipmentView() {
                   </div>
                 )}
 
-                {!isHandedOff &&
-                  !isCooling &&
-                  item.status === "In Service" && (
-                    <div className={styles.availableChip}>
-                      <FontAwesomeIcon icon={faCircleCheck} /> Available for handoff
-                    </div>
-                  )}
+                {!isHandedOff && !isCooling && item.status === "In Service" && (
+                  <div className={styles.availableChip}>
+                    <FontAwesomeIcon icon={faCircleCheck} /> Available for
+                    handoff
+                  </div>
+                )}
 
                 {item.ownershipType && item.ownershipType !== "Owned" && (
                   <div
@@ -645,18 +775,22 @@ export default function EquipmentView() {
                     {item.leaseCompany && <> · {item.leaseCompany}</>}
                     {item.leaseEndDate && (
                       <span className={styles.leaseChipDate}>
-                        {leaseWarn && <FontAwesomeIcon icon={faTriangleExclamation} />}
+                        {leaseWarn && (
+                          <FontAwesomeIcon icon={faTriangleExclamation} />
+                        )}
                         Ends {expiryLabel(item.leaseEndDate)}
                       </span>
                     )}
                   </div>
                 )}
 
-                {item.status === "Out of Service" && item.outOfServiceReason && (
-                  <p className={styles.oosReason}>
-                    <FontAwesomeIcon icon={faTriangleExclamation} /> {item.outOfServiceReason}
-                  </p>
-                )}
+                {item.status === "Out of Service" &&
+                  item.outOfServiceReason && (
+                    <p className={styles.oosReason}>
+                      <FontAwesomeIcon icon={faTriangleExclamation} />{" "}
+                      {item.outOfServiceReason}
+                    </p>
+                  )}
 
                 {(item.registrationExpiration ||
                   item.nextMaintenanceDue ||
@@ -665,25 +799,35 @@ export default function EquipmentView() {
                   <div className={styles.complianceRow}>
                     {item.registrationExpiration && (
                       <span className={`${styles.complianceTag} ${regWarn}`}>
-                        {regWarn && <FontAwesomeIcon icon={faTriangleExclamation} />}
+                        {regWarn && (
+                          <FontAwesomeIcon icon={faTriangleExclamation} />
+                        )}
                         Plate/Reg: {expiryLabel(item.registrationExpiration)}
                       </span>
                     )}
                     {item.insuranceExpiration && (
-                      <span className={`${styles.complianceTag} ${insuranceWarn}`}>
-                        {insuranceWarn && <FontAwesomeIcon icon={faTriangleExclamation} />}
+                      <span
+                        className={`${styles.complianceTag} ${insuranceWarn}`}
+                      >
+                        {insuranceWarn && (
+                          <FontAwesomeIcon icon={faTriangleExclamation} />
+                        )}
                         Insurance: {expiryLabel(item.insuranceExpiration)}
                       </span>
                     )}
                     {item.iftaIrpExpiration && (
                       <span className={`${styles.complianceTag} ${iftaWarn}`}>
-                        {iftaWarn && <FontAwesomeIcon icon={faTriangleExclamation} />}
+                        {iftaWarn && (
+                          <FontAwesomeIcon icon={faTriangleExclamation} />
+                        )}
                         IFTA/IRP: {expiryLabel(item.iftaIrpExpiration)}
                       </span>
                     )}
                     {item.nextMaintenanceDue && (
                       <span className={`${styles.complianceTag} ${maintWarn}`}>
-                        {maintWarn && <FontAwesomeIcon icon={faTriangleExclamation} />}
+                        {maintWarn && (
+                          <FontAwesomeIcon icon={faTriangleExclamation} />
+                        )}
                         Maintenance: {expiryLabel(item.nextMaintenanceDue)}
                       </span>
                     )}
@@ -727,7 +871,8 @@ export default function EquipmentView() {
             ) : (
               filtered.map((item) => {
                 const assigned = resolveAssignedDriver(item);
-                const { isHandedOff, isCooling, cooldownLeft, stuck } = getRowState(item);
+                const { isHandedOff, isCooling, cooldownLeft, stuck, stuckMessage } =
+                  getRowState(item);
                 const isOpen = expandedIds.has(item.id);
                 const rowCls = [
                   tableStyles.tr,
@@ -744,7 +889,10 @@ export default function EquipmentView() {
                   .join(" ");
                 return (
                   <React.Fragment key={item.id}>
-                    <tr className={rowCls} onClick={() => toggleExpanded(item.id)}>
+                    <tr
+                      className={rowCls}
+                      onClick={() => toggleExpanded(item.id)}
+                    >
                       <td className={tableStyles.tdExpand}>
                         <FontAwesomeIcon
                           icon={faChevronDown}
@@ -763,7 +911,9 @@ export default function EquipmentView() {
                             <FontAwesomeIcon
                               icon={
                                 TYPE_ICONS[item.equipmentType] ||
-                                (item.category === "Trailer" ? faTrailer : faTruck)
+                                (item.category === "Trailer"
+                                  ? faTrailer
+                                  : faTruck)
                               }
                             />
                             {TYPE_SHORT[item.equipmentType] && (
@@ -781,10 +931,14 @@ export default function EquipmentView() {
                             )}
                           </div>
                           <div>
-                            <div className={tableStyles.unitNumber}>{item.unitNumber}</div>
+                            <div className={tableStyles.unitNumber}>
+                              {item.unitNumber}
+                            </div>
                             <div className={tableStyles.unitType}>
                               {item.equipmentType}
-                              {item.modelDetails ? ` · ${item.modelDetails}` : ""}
+                              {item.modelDetails
+                                ? ` · ${item.modelDetails}`
+                                : ""}
                             </div>
                           </div>
                         </div>
@@ -800,17 +954,41 @@ export default function EquipmentView() {
                           {item.status}
                         </span>
                       </td>
-                      <td className={tableStyles.availCell}>
+                      <td
+                        className={tableStyles.availCell}
+                        onClick={(e) => stuck && e.stopPropagation()}
+                      >
                         {stuck ? (
-                          <span className={tableStyles.danger}>Stuck assignment</span>
+                          <div className={styles.stuckCell} title={stuckMessage}>
+                            <span className={tableStyles.danger}>
+                              {stuckMessage.split(" — ")[0]}
+                            </span>
+                            <button
+                              type="button"
+                              className={styles.releaseBtnSm}
+                              onClick={() => handleForceRelease(item)}
+                              disabled={releasingId === item.id}
+                            >
+                              <FontAwesomeIcon icon={faLinkSlash} />
+                              {releasingId === item.id
+                                ? "Releasing…"
+                                : "Release"}
+                            </button>
+                          </div>
                         ) : isHandedOff ? (
                           <span>
-                            <FontAwesomeIcon icon={faKey} style={{ marginRight: 4 }} />
+                            <FontAwesomeIcon
+                              icon={faKey}
+                              style={{ marginRight: 4 }}
+                            />
                             {assigned?.name || "Handed off"}
                           </span>
                         ) : isCooling ? (
                           <span>
-                            <FontAwesomeIcon icon={faClock} style={{ marginRight: 4 }} />
+                            <FontAwesomeIcon
+                              icon={faClock}
+                              style={{ marginRight: 4 }}
+                            />
                             {cooldownLeft != null && cooldownLeft > 0
                               ? `${cooldownLeft}m cooldown`
                               : "Cooling"}
@@ -826,30 +1004,46 @@ export default function EquipmentView() {
                         (item.capacityLbs || item.palletPositions) ? (
                           <>
                             {item.capacityLbs && (
-                              <strong>{item.capacityLbs.toLocaleString()} lb</strong>
+                              <strong>
+                                {item.capacityLbs.toLocaleString()} lb
+                              </strong>
                             )}
                             {item.capacityLbs && item.palletPositions && " · "}
-                            {item.palletPositions && `${item.palletPositions} pos`}
+                            {item.palletPositions &&
+                              `${item.palletPositions} pos`}
                           </>
                         ) : item.category === "Power Unit" ? (
                           <span className={tableStyles.metaTag}>
                             <FontAwesomeIcon
                               icon={
-                                pullsTrailer(item.equipmentType) ? faLink : faLinkSlash
+                                pullsTrailer(item.equipmentType)
+                                  ? faLink
+                                  : faLinkSlash
                               }
                               style={{ fontSize: 10 }}
                             />
-                            {pullsTrailer(item.equipmentType) ? "Pulls" : "Self"}
+                            {pullsTrailer(item.equipmentType)
+                              ? "Pulls"
+                              : "Self"}
                           </span>
                         ) : (
                           "—"
                         )}
                       </td>
                       <td>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 2,
+                          }}
+                        >
                           {item.licensePlate && (
                             <span className={tableStyles.metaTag}>
-                              <FontAwesomeIcon icon={faIdCard} style={{ fontSize: 9 }} />
+                              <FontAwesomeIcon
+                                icon={faIdCard}
+                                style={{ fontSize: 9 }}
+                              />
                               {item.licensePlate}
                             </span>
                           )}
@@ -869,7 +1063,8 @@ export default function EquipmentView() {
                         <ComplianceTags item={item} />
                       </td>
                       <td>
-                        {item.ownershipType && item.ownershipType !== "Owned" ? (
+                        {item.ownershipType &&
+                        item.ownershipType !== "Owned" ? (
                           <span className={tableStyles.ownershipLease}>
                             {item.ownershipType}
                             {item.leaseCompany ? ` · ${item.leaseCompany}` : ""}
@@ -908,13 +1103,19 @@ export default function EquipmentView() {
                             <div className={tableStyles.expandGrid}>
                               {item.vin && (
                                 <div className={tableStyles.expandItem}>
-                                  <span className={tableStyles.expandLabel}>VIN</span>
-                                  <span className={tableStyles.expandValue}>{item.vin}</span>
+                                  <span className={tableStyles.expandLabel}>
+                                    VIN
+                                  </span>
+                                  <span className={tableStyles.expandValue}>
+                                    {item.vin}
+                                  </span>
                                 </div>
                               )}
                               {item.registrationExpiration && (
                                 <div className={tableStyles.expandItem}>
-                                  <span className={tableStyles.expandLabel}>Registration</span>
+                                  <span className={tableStyles.expandLabel}>
+                                    Registration
+                                  </span>
                                   <span className={tableStyles.expandValue}>
                                     {toDateInput(item.registrationExpiration)} ·{" "}
                                     {expiryLabel(item.registrationExpiration)}
@@ -923,7 +1124,9 @@ export default function EquipmentView() {
                               )}
                               {item.insuranceProvider && (
                                 <div className={tableStyles.expandItem}>
-                                  <span className={tableStyles.expandLabel}>Insurance</span>
+                                  <span className={tableStyles.expandLabel}>
+                                    Insurance
+                                  </span>
                                   <span className={tableStyles.expandValue}>
                                     {item.insuranceProvider}
                                     {item.insurancePolicyNumber
@@ -937,7 +1140,9 @@ export default function EquipmentView() {
                               )}
                               {item.iftaIrpExpiration && (
                                 <div className={tableStyles.expandItem}>
-                                  <span className={tableStyles.expandLabel}>IFTA / IRP</span>
+                                  <span className={tableStyles.expandLabel}>
+                                    IFTA / IRP
+                                  </span>
                                   <span className={tableStyles.expandValue}>
                                     {toDateInput(item.iftaIrpExpiration)} ·{" "}
                                     {expiryLabel(item.iftaIrpExpiration)}
@@ -946,37 +1151,43 @@ export default function EquipmentView() {
                               )}
                               {item.nextMaintenanceDue && (
                                 <div className={tableStyles.expandItem}>
-                                  <span className={tableStyles.expandLabel}>Maintenance</span>
+                                  <span className={tableStyles.expandLabel}>
+                                    Maintenance
+                                  </span>
                                   <span className={tableStyles.expandValue}>
                                     {toDateInput(item.nextMaintenanceDue)} ·{" "}
                                     {expiryLabel(item.nextMaintenanceDue)}
                                   </span>
                                 </div>
                               )}
-                              {item.ownershipType && item.ownershipType !== "Owned" && (
-                                <div className={tableStyles.expandItem}>
-                                  <span className={tableStyles.expandLabel}>
-                                    {item.ownershipType}
-                                  </span>
-                                  <span className={tableStyles.expandValue}>
-                                    {item.leaseCompany || "—"}
-                                    {item.leaseEndDate
-                                      ? ` · ends ${toDateInput(item.leaseEndDate)}`
-                                      : ""}
-                                    {item.monthlyPaymentAmount
-                                      ? ` · $${item.monthlyPaymentAmount}/mo`
-                                      : ""}
-                                  </span>
-                                </div>
-                              )}
-                              {item.status === "Out of Service" && item.outOfServiceReason && (
-                                <div className={tableStyles.expandItem}>
-                                  <span className={tableStyles.expandLabel}>OOS Reason</span>
-                                  <span className={tableStyles.expandValue}>
-                                    {item.outOfServiceReason}
-                                  </span>
-                                </div>
-                              )}
+                              {item.ownershipType &&
+                                item.ownershipType !== "Owned" && (
+                                  <div className={tableStyles.expandItem}>
+                                    <span className={tableStyles.expandLabel}>
+                                      {item.ownershipType}
+                                    </span>
+                                    <span className={tableStyles.expandValue}>
+                                      {item.leaseCompany || "—"}
+                                      {item.leaseEndDate
+                                        ? ` · ends ${toDateInput(item.leaseEndDate)}`
+                                        : ""}
+                                      {item.monthlyPaymentAmount
+                                        ? ` · $${item.monthlyPaymentAmount}/mo`
+                                        : ""}
+                                    </span>
+                                  </div>
+                                )}
+                              {item.status === "Out of Service" &&
+                                item.outOfServiceReason && (
+                                  <div className={tableStyles.expandItem}>
+                                    <span className={tableStyles.expandLabel}>
+                                      OOS Reason
+                                    </span>
+                                    <span className={tableStyles.expandValue}>
+                                      {item.outOfServiceReason}
+                                    </span>
+                                  </div>
+                                )}
                               {isHandedOff && assigned && (
                                 <div className={tableStyles.expandItem}>
                                   <span className={tableStyles.expandLabel}>
@@ -984,16 +1195,24 @@ export default function EquipmentView() {
                                   </span>
                                   <span className={tableStyles.expandValue}>
                                     {assigned.name}
-                                    {assigned.employeeId ? ` · #${assigned.employeeId}` : ""}
-                                    {assigned.status ? ` · ${assigned.status}` : ""}
+                                    {assigned.employeeId
+                                      ? ` · #${assigned.employeeId}`
+                                      : ""}
+                                    {assigned.status
+                                      ? ` · ${assigned.status}`
+                                      : ""}
                                   </span>
                                 </div>
                               )}
                             </div>
                             {item.notes ? (
-                              <p className={tableStyles.expandNotes}>{item.notes}</p>
+                              <p className={tableStyles.expandNotes}>
+                                {item.notes}
+                              </p>
                             ) : (
-                              <p className={tableStyles.expandNotes}>No notes on file.</p>
+                              <p className={tableStyles.expandNotes}>
+                                No notes on file.
+                              </p>
                             )}
                           </div>
                         </div>
@@ -1021,7 +1240,9 @@ export default function EquipmentView() {
             <span className={styles.headerMeta}>
               {" · "}
               {availabilityCounts.available} available
-              {availabilityCounts.in_use > 0 && <> · {availabilityCounts.in_use} in use</>}
+              {availabilityCounts.in_use > 0 && (
+                <> · {availabilityCounts.in_use} in use</>
+              )}
               {availabilityCounts.cooling > 0 && (
                 <> · {availabilityCounts.cooling} cooling</>
               )}
@@ -1035,7 +1256,11 @@ export default function EquipmentView() {
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div className={tableStyles.viewToggle} role="group" aria-label="View mode">
+          <div
+            className={tableStyles.viewToggle}
+            role="group"
+            aria-label="View mode"
+          >
             <button
               type="button"
               className={`${tableStyles.toggleBtn} ${
@@ -1061,7 +1286,11 @@ export default function EquipmentView() {
               <span className={tableStyles.toggleLabel}>Table</span>
             </button>
           </div>
-          <button className={styles.addBtn} onClick={openAdd} id="add-equipment-btn">
+          <button
+            className={styles.addBtn}
+            onClick={openAdd}
+            id="add-equipment-btn"
+          >
             <FontAwesomeIcon icon={faPlus} /> Add Equipment
           </button>
         </div>
@@ -1085,7 +1314,12 @@ export default function EquipmentView() {
       {/* Quick availability chips */}
       <div className={styles.toolbar} style={{ marginBottom: 10 }}>
         {[
-          { key: "all", label: "All", count: availabilityCounts.all, icon: null },
+          {
+            key: "all",
+            label: "All",
+            count: availabilityCounts.all,
+            icon: null,
+          },
           {
             key: "available",
             label: "Available",
@@ -1185,7 +1419,9 @@ export default function EquipmentView() {
           onChange={(e) => setAvailabilityFilter(e.target.value)}
           aria-label="Filter by availability"
         >
-          <option value="all">All availability ({availabilityCounts.all})</option>
+          <option value="all">
+            All availability ({availabilityCounts.all})
+          </option>
           <option value="available">
             Available ({availabilityCounts.available})
           </option>
@@ -1205,7 +1441,11 @@ export default function EquipmentView() {
           )}
         </select>
         {filtersActive && (
-          <button type="button" className={styles.clearFiltersBtn} onClick={clearFilters}>
+          <button
+            type="button"
+            className={styles.clearFiltersBtn}
+            onClick={clearFilters}
+          >
             Clear filters
           </button>
         )}
@@ -1226,7 +1466,11 @@ export default function EquipmentView() {
         title={editing ? "Edit Equipment" : "Add Equipment"}
         size="md"
       >
-        <form onSubmit={handleSubmit} id="equipment-form" className={styles.form}>
+        <form
+          onSubmit={handleSubmit}
+          id="equipment-form"
+          className={styles.form}
+        >
           {error && <div className={styles.formError}>{error}</div>}
           <div className={styles.formGrid}>
             <div className={styles.formGroup}>
@@ -1236,7 +1480,9 @@ export default function EquipmentView() {
                 className={styles.input}
                 required
                 value={form.unitNumber}
-                onChange={(e) => setForm((f) => ({ ...f, unitNumber: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, unitNumber: e.target.value }))
+                }
                 placeholder="T-001"
               />
             </div>
@@ -1273,7 +1519,9 @@ export default function EquipmentView() {
                 type="number"
                 className={styles.input}
                 value={form.year}
-                onChange={(e) => setForm((f) => ({ ...f, year: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, year: e.target.value }))
+                }
                 placeholder="2022"
               />
             </div>
@@ -1295,7 +1543,9 @@ export default function EquipmentView() {
                 id="eq-vin"
                 className={styles.input}
                 value={form.vin}
-                onChange={(e) => setForm((f) => ({ ...f, vin: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, vin: e.target.value }))
+                }
                 placeholder="1FUJGLDR6NLXXXXXX"
               />
             </div>
@@ -1324,14 +1574,19 @@ export default function EquipmentView() {
                     min="0"
                     value={form.palletPositions}
                     onChange={(e) =>
-                      setForm((f) => ({ ...f, palletPositions: e.target.value }))
+                      setForm((f) => ({
+                        ...f,
+                        palletPositions: e.target.value,
+                      }))
                     }
                     placeholder="e.g. 18"
                   />
                 </div>
               </>
             )}
-            <div className={`${styles.formGroup} ${formIsTrailer ? "" : styles.fullWidth}`}>
+            <div
+              className={`${styles.formGroup} ${formIsTrailer ? "" : styles.fullWidth}`}
+            >
               <label className={styles.label}>Model / Details</label>
               <input
                 id="eq-model"
@@ -1341,12 +1596,17 @@ export default function EquipmentView() {
                   setForm((f) => ({ ...f, modelDetails: e.target.value }))
                 }
                 placeholder={
-                  formIsTrailer ? "Deck length or special handling" : "Freightliner Cascadia"
+                  formIsTrailer
+                    ? "Deck length or special handling"
+                    : "Freightliner Cascadia"
                 }
               />
             </div>
-            <div className={`${styles.formGroup} ${styles.fullWidth} ${styles.sectionTitle}`}>
-              <FontAwesomeIcon icon={faClipboardCheck} /> Status &amp; Compliance
+            <div
+              className={`${styles.formGroup} ${styles.fullWidth} ${styles.sectionTitle}`}
+            >
+              <FontAwesomeIcon icon={faClipboardCheck} /> Status &amp;
+              Compliance
             </div>
             <div className={styles.formGroup}>
               <label className={styles.label}>Status</label>
@@ -1354,7 +1614,9 @@ export default function EquipmentView() {
                 id="eq-status"
                 className={styles.input}
                 value={form.status}
-                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, status: e.target.value }))
+                }
               >
                 <option value="In Service">In Service</option>
                 <option value="Out of Service">Out of Service</option>
@@ -1368,20 +1630,28 @@ export default function EquipmentView() {
                   className={styles.input}
                   value={form.outOfServiceReason}
                   onChange={(e) =>
-                    setForm((f) => ({ ...f, outOfServiceReason: e.target.value }))
+                    setForm((f) => ({
+                      ...f,
+                      outOfServiceReason: e.target.value,
+                    }))
                   }
                   placeholder="Brake repair, awaiting parts…"
                 />
               </div>
             )}
             <div className={styles.formGroup}>
-              <label className={styles.label}>Registration / Plate Expiration</label>
+              <label className={styles.label}>
+                Registration / Plate Expiration
+              </label>
               <DateTimePicker
                 value={form.registrationExpiration || ""}
+                dateOnly
                 onChange={(date) =>
                   setForm((f) => ({
                     ...f,
-                    registrationExpiration: date ? toLocalISO(date, { dateOnly: true }) : "",
+                    registrationExpiration: date
+                      ? toLocalISO(date, { dateOnly: true })
+                      : "",
                   }))
                 }
               />
@@ -1390,16 +1660,22 @@ export default function EquipmentView() {
               <label className={styles.label}>Next Maintenance Due</label>
               <DateTimePicker
                 value={form.nextMaintenanceDue || ""}
+                dateOnly
                 onChange={(date) =>
                   setForm((f) => ({
                     ...f,
-                    nextMaintenanceDue: date ? toLocalISO(date, { dateOnly: true }) : "",
+                    nextMaintenanceDue: date
+                      ? toLocalISO(date, { dateOnly: true })
+                      : "",
                   }))
                 }
               />
             </div>
-            <div className={`${styles.formGroup} ${styles.fullWidth} ${styles.sectionTitle}`}>
-              <FontAwesomeIcon icon={faShieldHalved} /> Insurance &amp; Tax Filings
+            <div
+              className={`${styles.formGroup} ${styles.fullWidth} ${styles.sectionTitle}`}
+            >
+              <FontAwesomeIcon icon={faShieldHalved} /> Insurance &amp; Tax
+              Filings
             </div>
             <div className={styles.formGroup}>
               <label className={styles.label}>Insurance Provider</label>
@@ -1420,7 +1696,10 @@ export default function EquipmentView() {
                 className={styles.input}
                 value={form.insurancePolicyNumber}
                 onChange={(e) =>
-                  setForm((f) => ({ ...f, insurancePolicyNumber: e.target.value }))
+                  setForm((f) => ({
+                    ...f,
+                    insurancePolicyNumber: e.target.value,
+                  }))
                 }
               />
             </div>
@@ -1428,10 +1707,13 @@ export default function EquipmentView() {
               <label className={styles.label}>Insurance Renewal Date</label>
               <DateTimePicker
                 value={form.insuranceExpiration || ""}
+                dateOnly
                 onChange={(date) =>
                   setForm((f) => ({
                     ...f,
-                    insuranceExpiration: date ? toLocalISO(date, { dateOnly: true }) : "",
+                    insuranceExpiration: date
+                      ? toLocalISO(date, { dateOnly: true })
+                      : "",
                   }))
                 }
               />
@@ -1440,15 +1722,20 @@ export default function EquipmentView() {
               <label className={styles.label}>IFTA / IRP Renewal Date</label>
               <DateTimePicker
                 value={form.iftaIrpExpiration || ""}
+                dateOnly
                 onChange={(date) =>
                   setForm((f) => ({
                     ...f,
-                    iftaIrpExpiration: date ? toLocalISO(date, { dateOnly: true }) : "",
+                    iftaIrpExpiration: date
+                      ? toLocalISO(date, { dateOnly: true })
+                      : "",
                   }))
                 }
               />
             </div>
-            <div className={`${styles.formGroup} ${styles.fullWidth} ${styles.sectionTitle}`}>
+            <div
+              className={`${styles.formGroup} ${styles.fullWidth} ${styles.sectionTitle}`}
+            >
               <FontAwesomeIcon icon={faFileContract} /> Ownership
             </div>
             <div className={styles.formGroup}>
@@ -1470,7 +1757,9 @@ export default function EquipmentView() {
               <>
                 <div className={styles.formGroup}>
                   <label className={styles.label}>
-                    {form.ownershipType === "Leased" ? "Leasing Company" : "Lender"}
+                    {form.ownershipType === "Leased"
+                      ? "Leasing Company"
+                      : "Lender"}
                   </label>
                   <input
                     id="eq-lease-company"
@@ -1483,14 +1772,19 @@ export default function EquipmentView() {
                 </div>
                 <div className={styles.formGroup}>
                   <label className={styles.label}>
-                    {form.ownershipType === "Leased" ? "Lease End Date" : "Payoff Date"}
+                    {form.ownershipType === "Leased"
+                      ? "Lease End Date"
+                      : "Payoff Date"}
                   </label>
                   <DateTimePicker
                     value={form.leaseEndDate || ""}
+                    dateOnly
                     onChange={(date) =>
                       setForm((f) => ({
                         ...f,
-                        leaseEndDate: date ? toLocalISO(date, { dateOnly: true }) : "",
+                        leaseEndDate: date
+                          ? toLocalISO(date, { dateOnly: true })
+                          : "",
                       }))
                     }
                   />
@@ -1505,7 +1799,10 @@ export default function EquipmentView() {
                     className={styles.input}
                     value={form.monthlyPaymentAmount}
                     onChange={(e) =>
-                      setForm((f) => ({ ...f, monthlyPaymentAmount: e.target.value }))
+                      setForm((f) => ({
+                        ...f,
+                        monthlyPaymentAmount: e.target.value,
+                      }))
                     }
                   />
                 </div>
@@ -1517,13 +1814,19 @@ export default function EquipmentView() {
                 id="eq-notes"
                 className={styles.input}
                 value={form.notes}
-                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, notes: e.target.value }))
+                }
                 placeholder="Any additional info…"
               />
             </div>
           </div>
           <div className={styles.formActions}>
-            <button type="button" className={styles.cancelBtn} onClick={closeModal}>
+            <button
+              type="button"
+              className={styles.cancelBtn}
+              onClick={closeModal}
+            >
               Cancel
             </button>
             <button
@@ -1544,9 +1847,14 @@ export default function EquipmentView() {
         title="Delete Equipment"
         size="sm"
       >
-        <p className={styles.confirmText}>Delete this unit? This cannot be undone.</p>
+        <p className={styles.confirmText}>
+          Delete this unit? This cannot be undone.
+        </p>
         <div className={styles.formActions}>
-          <button className={styles.cancelBtn} onClick={() => setDeleteId(null)}>
+          <button
+            className={styles.cancelBtn}
+            onClick={() => setDeleteId(null)}
+          >
             Cancel
           </button>
           <button
@@ -1561,7 +1869,3 @@ export default function EquipmentView() {
     </div>
   );
 }
-
-
-
-

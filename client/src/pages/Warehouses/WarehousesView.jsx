@@ -10,6 +10,7 @@ import Modal from '../../components/Modal/Modal.jsx';
 import TimePicker from '../../styles/TimePicker.jsx';
 import styles from './WarehousesView.module.css';
 import tableStyles from './WarehousesView.table.module.css';
+import LiveClock from '../../styles/Liveclock.jsx'; // adjust path to match your folder layout
 
 const DAYS = [
   { key: 'MON', label: 'M', full: 'Mon' },
@@ -169,9 +170,12 @@ export default function WarehousesView() {
           <h1 className={styles.pageTitle}>Warehouses</h1>
           <p className={styles.pageSub}>{warehouses.length} facilities registered</p>
         </div>
-        <button className={styles.addBtn} onClick={openAdd} id="add-warehouse-btn">
-          <FontAwesomeIcon icon={faPlus} /> Add Warehouse
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <LiveClock />
+          <button className={styles.addBtn} onClick={openAdd} id="add-warehouse-btn">
+            <FontAwesomeIcon icon={faPlus} /> Add Warehouse
+          </button>
+        </div>
       </div>
 
       <div className={tableStyles.toolbar}>

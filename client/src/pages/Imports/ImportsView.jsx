@@ -40,6 +40,7 @@ import DateTimePicker, { toLocalISO } from "../../styles/Datetimepicker.jsx";
 // Template lives at src/pages/Import/templates/ (adjust if you move it under Imports/)
 import CevaTemplate from "../Imports/Templates/Ceva-template.jsx";
 import styles from "./ImportsView.module.css";
+import LiveClock from "../../styles/Liveclock.jsx"; // adjust path to match your folder layout
 import tableStyles from "./ImportsView.table.module.css";
 
 const AIRLINE_PALETTE = [
@@ -367,6 +368,7 @@ export default function ImportsView() {
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <LiveClock />
           <div className={tableStyles.viewToggle} role="group" aria-label="View mode">
             <button
               type="button"

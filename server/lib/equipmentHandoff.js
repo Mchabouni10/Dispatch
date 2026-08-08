@@ -40,6 +40,25 @@ async function checkoutEquipment(tx, {
   preTripCompleted,
   preTripNotes,
 }) {
+  // Defensive: if this equipment is already checked out to a DIFFERENT
+  // driver, release that prior assignment first instead of silently
+  // overwriting it. Without this, the old holder's EquipmentHandoff row
+  // is left open forever (isActive: true) even though
+  // Equipment.assignedDriverId now points at the new driver — the old
+  // driver keeps showing as "handed off" on a unit they no longer
+  // actually have, with no active trip and no way to explain it.
+  // Re-checking out to the SAME driver (e.g. trip reusing their morning
+  // handoff) is untouched — that's not a conflict.
+  const current = await tx.equipment.findUnique({ where: { id: equipmentId } });
+  if (current?.assignedDriverId && current.assignedDriverId !== driverId) {
+    await releaseEquipment(tx, {
+      equipmentId,
+      cooldownMinutes: 0,
+      reason: 'DISPATCH',
+      reasonNote: 'Auto-released — reassigned to a different driver without a formal return',
+    });
+  }
+
   await tx.equipment.update({
     where: { id: equipmentId },
     data: { assignedDriverId: driverId, availableAt: null },
@@ -83,6 +102,7 @@ async function checkoutEquipment(tx, {
  */
 async function releaseEquipment(tx, {
   equipmentId,
+  handoffId,
   cooldownMinutes = 0,
   reason = 'SHIFT_END',
   reasonNote,
@@ -94,10 +114,17 @@ async function releaseEquipment(tx, {
   damageDescription,
   returnedBy,
 }) {
-  const activeHandoff = await tx.equipmentHandoff.findFirst({
-    where: { equipmentId, isActive: true },
-    orderBy: { checkOutTime: 'desc' },
-  });
+  // If the caller already knows exactly which handoff row to close (e.g.
+  // releaseTripCreatedCheckouts, which found it by tripId), close that
+  // exact row instead of guessing "most recent active" — guards against
+  // ever closing the wrong one if more than one active row somehow exists
+  // for the same equipment.
+  const activeHandoff = handoffId
+    ? await tx.equipmentHandoff.findUnique({ where: { id: handoffId } })
+    : await tx.equipmentHandoff.findFirst({
+        where: { equipmentId, isActive: true },
+        orderBy: { checkOutTime: 'desc' },
+      });
 
   await tx.equipment.update({
     where: { id: equipmentId },
@@ -152,6 +179,7 @@ async function releaseTripCreatedCheckouts(tx, { tripId, equipmentIds }) {
     released.push(
       await releaseEquipment(tx, {
         equipmentId: handoff.equipmentId,
+        handoffId: handoff.id,
         cooldownMinutes: 0,
         reason: 'DISPATCH',
         reasonNote: 'Trip cancelled — dispatch checkout released',

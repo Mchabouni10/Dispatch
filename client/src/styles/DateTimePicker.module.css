@@ -87,6 +87,11 @@
   border-right: 1px solid var(--border);
 }
 
+/* dateOnly mode: no time side, so no divider to draw */
+.calendarSideOnly {
+  border-right: none;
+}
+
 .monthRow {
   display: flex;
   align-items: center;

@@ -14,6 +14,7 @@ import Modal from '../../components/Modal/Modal.jsx';
 import StatusBadge from '../../components/StatusBadge/StatusBadge.jsx';
 import DateTimePicker, { toLocalISO } from '../../styles/Datetimepicker.jsx';
 import styles from '../Imports/ImportsView.module.css';
+import LiveClock from "../../styles/Liveclock.jsx"; // adjust path to match your folder layout
 import tableStyles from './ExportsView.table.module.css';
 
 function formatDateTime(d) {
@@ -223,6 +224,7 @@ export default function ExportsView() {
           <p className={styles.pageSub}>{shipments.length} export{shipments.length !== 1 ? 's' : ''} ready for dispatch</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <LiveClock />
           <div className={tableStyles.viewToggle} role="group" aria-label="View mode">
             <button type="button"
               className={`${tableStyles.toggleBtn} ${viewMode === 'cards' ? tableStyles.toggleBtnActive : ''}`}
