@@ -377,7 +377,7 @@ export default function NotCheckedInColumn({
                   </div>
                 </div>
               </div>
-              <div className={styles.cardBody}>
+              <div className={`${styles.cardBody} ${styles.cardBodyLg}`}>
                 <div className={styles.scheduleRow}>
                   <FontAwesomeIcon icon={faCalendarDay} className={styles.iconSmall} />
                   {driver.shiftStart && driver.shiftEnd ? (

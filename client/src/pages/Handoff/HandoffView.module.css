@@ -495,6 +495,22 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Header alert badge — "X holding equipment" */
+.staleHoldBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(255, 159, 67, 0.14);
+  border: 1px solid rgba(255, 159, 67, 0.32);
+  color: #ffb257;
+  white-space: nowrap;
+}
+
 .cardList {
   display: flex;
   flex-direction: column;
@@ -544,6 +560,10 @@
 
 .pastEndCard { background: rgba(255, 71, 87, 0.04); }
 .pastEndCard::before { background: #ff4757; }
+
+/* stale-hold = driver holds equipment from a prior shift */
+.cardStaleHold { background: rgba(255, 159, 67, 0.03); }
+.cardStaleHold::before { background: #ffb257; }
 
 .card:hover {
   background: rgba(255, 255, 255, 0.025);
@@ -605,7 +625,63 @@
 .dot { color: var(--text-muted); margin: 0 1px; }
 
 .cardBody {
-  padding: 0 14px 12px 61px;
+  padding: 0 14px 12px 61px; /* aligns under 36px avatar + 11px gap + 14px left */
+}
+
+/* Wider left indent for the 48px avatar used in the Not-Checked-In column */
+.cardBodyLg {
+  padding: 0 14px 12px 73px; /* 48px avatar + 11px gap + 14px left */
+}
+
+/* ── Stale-hold tag (inline in card body) ── */
+.staleHoldTag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  margin-bottom: 7px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  background: rgba(255, 159, 67, 0.1);
+  border: 1px solid rgba(255, 159, 67, 0.3);
+  color: #ffb257;
+}
+
+.staleHoldTag svg {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: #ffb257;
+}
+
+/* ── Release equipment button ── */
+.releaseStaleBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 7px 10px;
+  margin-top: 6px;
+  background: rgba(255, 159, 67, 0.08);
+  border: 1px solid rgba(255, 159, 67, 0.3);
+  border-radius: 8px;
+  color: #ffb257;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.releaseStaleBtn:hover {
+  background: rgba(255, 159, 67, 0.14);
+  border-color: rgba(255, 159, 67, 0.5);
+}
+
+.releaseStaleBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .statusBadge {
