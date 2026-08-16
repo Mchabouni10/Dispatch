@@ -2,9 +2,12 @@ const express = require('express');
 const router = express.Router();
 const { prisma, saveBase64Image, populateTrip } = require('./dispatch.helpers');
 const { releaseEquipment } = require('../../lib/equipmentHandoff');
+const { emit } = require('../../lib/realtime');
+const requirePermission = require('../../middleware/requirePermission');
+const { sanitizeDriverForRole } = require('../../lib/driverFieldAccess');
 
 // PATCH start trip
-router.patch('/:id/start', async (req, res) => {
+router.patch('/:id/start', requirePermission('dispatch', 'full'), async (req, res) => {
   try {
     const trip = await prisma.trip.findUnique({ where: { id: req.params.id } });
     if (!trip) return res.status(404).json({ message: 'Trip not found' });
@@ -34,6 +37,7 @@ router.patch('/:id/start', async (req, res) => {
     });
 
     const populated = await populateTrip(updatedTrip);
+    emit('trip:upsert', populated);
     res.json(populated);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -59,7 +63,7 @@ router.patch('/:id/start', async (req, res) => {
 // Any shipment on the trip that ISN'T in `outcomes` is treated as "delivered" —
 // this keeps the endpoint backward compatible if it's ever called without the
 // new reconciliation UI.
-router.patch('/:id/finish', async (req, res) => {
+router.patch('/:id/finish', requirePermission('dispatch', 'full'), async (req, res) => {
   try {
     const trip = await prisma.trip.findUnique({ where: { id: req.params.id } });
     if (!trip) return res.status(404).json({ message: 'Trip not found' });
@@ -273,6 +277,23 @@ router.patch('/:id/finish', async (req, res) => {
     });
 
     const populated = await populateTrip(updatedTrip);
+    emit('trip:upsert', populated);
+    // The transaction above also updates Driver.status (Available / Off
+    // Duty / Break) as part of finishing the trip — broadcast that too,
+    // since the dashboard's driver list would otherwise only pick it up
+    // on its next 30s poll.
+    //
+    // sanitizeDriverForRole(..., 'VIEWER') strips pay rate, license number,
+    // medical/DOB/address/emergency-contact fields before this goes out —
+    // this previously broadcast the RAW driver record to every socket in the
+    // 'dashboard' room (Dispatcher and Viewer sessions included), leaking
+    // exactly the HR data the REST endpoints redact for those roles. Matches
+    // the pattern already used in routes/drivers.js for every other
+    // driver:upsert broadcast.
+    if (trip.driverId) {
+      const driver = await prisma.driver.findUnique({ where: { id: trip.driverId } });
+      if (driver) emit('driver:upsert', sanitizeDriverForRole(driver, 'VIEWER'));
+    }
     res.json(populated);
   } catch (err) {
     console.error('[PATCH /api/dispatch/:id/finish]', err);

@@ -1,8 +1,41 @@
 // routes/equipment.js
 const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { checkoutEquipment, releaseEquipment } = require('../lib/equipmentHandoff');
+const requirePermission = require('../middleware/requirePermission');
+
+// 'view' here also admits the 'operational' tier (Dispatcher), so they can
+// load equipment lists/cards to run the Handoff Board. Everything that
+// creates/edits specs/deletes/manages photos requires 'full' below; the two
+// status-style actions (assign/release, status/out-of-service) require only
+// 'operational' so Dispatcher can do their job without generic edit rights.
+router.use(requirePermission('equipment', 'view'));
+
+// Unit photo uploads (gallery — append to Equipment.images[])
+const uploadDir = path.join(__dirname, '..', 'uploads', 'equipment');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.jpg';
+    cb(null, `${req.params.id}-${Date.now()}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowed.includes(file.mimetype)) return cb(null, true);
+    cb(new Error('Only JPEG, PNG or WEBP images are allowed'));
+  },
+});
 
 // ──────────────────────────────────────────────────────────────
 // 1. GET all equipment
@@ -36,9 +69,9 @@ router.get('/', async (req, res) => {
 });
 
 // ──────────────────────────────────────────────────────────────
-// 2. POST create unit
+// 2. POST create unit — requires 'full', not exposed to Dispatcher.
 // ──────────────────────────────────────────────────────────────
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('equipment', 'full'), async (req, res) => {
   try {
     const cleanData = { ...req.body };
     Object.keys(cleanData).forEach((key) => {
@@ -132,9 +165,11 @@ router.get('/history/equipment/:equipmentId', async (req, res) => {
 });
 
 // ──────────────────────────────────────────────────────────────
-// 5. POST swap equipment mid-shift
+// 5. POST swap equipment mid-shift — requires 'operational'; this is a
+// Handoff Board action (like assign/release), not a specs edit, so Dispatcher
+// can do it.
 // ──────────────────────────────────────────────────────────────
-router.post('/:id/swap', async (req, res) => {
+router.post('/:id/swap', requirePermission('equipment', 'operational'), async (req, res) => {
   try {
     const {
       driverId,
@@ -265,14 +300,16 @@ router.post('/:id/swap', async (req, res) => {
 });
 
 // ──────────────────────────────────────────────────────────────
-// 6. PATCH assign/release with full history logging
+// 6. PATCH assign/release with full history logging — requires 'operational'.
+// This IS the Handoff Board's key-handoff action, so Dispatcher needs it even
+// though they can't otherwise edit an equipment record.
 //
 // NOTE: release now optionally accepts trailerId so end-of-shift can
 // release the truck AND its paired trailer atomically — previously only
 // req.params.id (the truck) was ever released, leaving trailers stuck
 // "assigned" to off-duty drivers indefinitely.
 // ──────────────────────────────────────────────────────────────
-router.patch('/:id/assign', async (req, res) => {
+router.patch('/:id/assign', requirePermission('equipment', 'operational'), async (req, res) => {
   try {
     const {
       driverId,
@@ -427,6 +464,125 @@ router.patch('/:id/assign', async (req, res) => {
 });
 
 // ──────────────────────────────────────────────────────────────
+// 6a. PATCH status only — requires 'operational'.
+// Deliberately narrow (status + outOfServiceReason only, not the general PUT)
+// so Dispatcher can flag a truck out of service or bring it back In Service
+// without being able to touch specs, unit number, or anything else on the
+// record. Mirrors the drivers.js PATCH /:id/status pattern.
+// ──────────────────────────────────────────────────────────────
+router.patch('/:id/status', requirePermission('equipment', 'operational'), async (req, res) => {
+  try {
+    const { status, outOfServiceReason } = req.body;
+    if (!status || typeof status !== 'string') {
+      return res.status(400).json({ message: 'status is required' });
+    }
+
+    const data = { status };
+    // Clear the reason whenever the unit isn't Out of Service, so a stale
+    // reason never lingers once the unit is back in service.
+    data.outOfServiceReason = status === 'Out of Service' ? (outOfServiceReason || null) : null;
+
+    const item = await prisma.equipment.update({
+      where: { id: req.params.id },
+      data,
+      include: {
+        assignedDriver: {
+          select: { id: true, name: true, photo: true, employeeId: true, status: true },
+        },
+      },
+    });
+    res.json(item);
+  } catch (err) {
+    console.error('[PATCH /api/equipment/:id/status] Error:', err);
+    if (err.code === 'P2025') {
+      return res.status(404).json({ message: 'Equipment not found' });
+    }
+    res.status(400).json({ message: err.message });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────
+// 6b. POST upload unit photo (appends to images[]) — requires 'full'.
+// ──────────────────────────────────────────────────────────────
+router.post('/:id/photos', requirePermission('equipment', 'full'), upload.single('photo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No photo uploaded' });
+    }
+
+    const existing = await prisma.equipment.findUnique({
+      where: { id: req.params.id },
+    });
+    if (!existing) {
+      // clean orphan file
+      fs.unlink(req.file.path, () => {});
+      return res.status(404).json({ message: 'Equipment not found' });
+    }
+
+    const photoPath = `/uploads/equipment/${req.file.filename}`;
+    const images = Array.isArray(existing.images) ? [...existing.images, photoPath] : [photoPath];
+
+    const item = await prisma.equipment.update({
+      where: { id: req.params.id },
+      data: { images },
+      include: {
+        assignedDriver: {
+          select: { id: true, name: true, photo: true, employeeId: true, status: true },
+        },
+      },
+    });
+    res.json(item);
+  } catch (err) {
+    console.error('[POST /api/equipment/:id/photos] Error:', err);
+    if (err.code === 'P2025') {
+      return res.status(404).json({ message: 'Equipment not found' });
+    }
+    res.status(400).json({ message: err.message });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────
+// 6c. DELETE one unit photo by path — requires 'full'.
+// Body: { path: "/uploads/equipment/..." }
+// ──────────────────────────────────────────────────────────────
+router.delete('/:id/photos', requirePermission('equipment', 'full'), async (req, res) => {
+  try {
+    const photoPath = req.body?.path;
+    if (!photoPath) {
+      return res.status(400).json({ message: 'path is required' });
+    }
+
+    const existing = await prisma.equipment.findUnique({
+      where: { id: req.params.id },
+    });
+    if (!existing) return res.status(404).json({ message: 'Equipment not found' });
+
+    const images = (existing.images || []).filter((p) => p !== photoPath);
+    if (images.length === (existing.images || []).length) {
+      return res.status(404).json({ message: 'Photo not found on this unit' });
+    }
+
+    // Best-effort disk cleanup
+    const diskPath = path.join(__dirname, '..', photoPath.replace(/^\/+/, ''));
+    fs.unlink(diskPath, () => {});
+
+    const item = await prisma.equipment.update({
+      where: { id: req.params.id },
+      data: { images },
+      include: {
+        assignedDriver: {
+          select: { id: true, name: true, photo: true, employeeId: true, status: true },
+        },
+      },
+    });
+    res.json(item);
+  } catch (err) {
+    console.error('[DELETE /api/equipment/:id/photos] Error:', err);
+    res.status(400).json({ message: err.message });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────
 // 7. GET single unit
 // ──────────────────────────────────────────────────────────────
 router.get('/:id', async (req, res) => {
@@ -455,9 +611,11 @@ router.get('/:id', async (req, res) => {
 });
 
 // ──────────────────────────────────────────────────────────────
-// 8. PUT update unit
+// 8. PUT update unit — requires 'full'; general specs edit, not exposed to
+// Dispatcher. Use PATCH /:id/status above for the one field Dispatcher is
+// allowed to change.
 // ──────────────────────────────────────────────────────────────
-router.put('/:id', async (req, res) => {
+router.put('/:id', requirePermission('equipment', 'full'), async (req, res) => {
   try {
     const update = { ...req.body };
     Object.keys(update).forEach((key) => {
@@ -487,9 +645,9 @@ router.put('/:id', async (req, res) => {
 });
 
 // ──────────────────────────────────────────────────────────────
-// 9. DELETE unit
+// 9. DELETE unit — requires 'full', not exposed to Dispatcher.
 // ──────────────────────────────────────────────────────────────
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requirePermission('equipment', 'full'), async (req, res) => {
   try {
     await prisma.equipment.delete({ where: { id: req.params.id } });
     res.json({ message: 'Equipment deleted successfully' });
@@ -503,3 +661,4 @@ router.delete('/:id', async (req, res) => {
 });
 
 module.exports = router;
+

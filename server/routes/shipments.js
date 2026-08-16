@@ -2,6 +2,8 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
+const requirePermission = require('../middleware/requirePermission');
+router.use(requirePermission('shipments', 'view'));
 
 // Helper: Get airline details
 async function getAirlineDetails(airlineId) {
@@ -25,6 +27,7 @@ function normalizeAwb(airlinePrefix, awbNumber) {
 const shipmentDateFields = [
   'lastFreeDay',
   'flightDate',
+  'flightEta',
   'lockoutTime',
   'pickupReadyAt',
   'deliveryAppointmentAt'
@@ -39,9 +42,10 @@ const shipmentDateFields = [
 const SHIPMENT_WRITABLE_FIELDS = [
   'type', 'status', 'pieces', 'weight', 'weightUnit', 'notes',
   'airwaybillNumber', 'pmcCount',
-  'ordNumber', 'lastFreeDay', 'storageFeePerDay', 'storageFeeDaysOver',
+  'ordNumber', 'originCity', 'flightNumber', 'lastFreeDay', 'storageFeePerDay', 'storageFeeDaysOver',
   'storageFeePaid', 'terminalFee', 'terminalFeePaid', 'isGDP', 'gdpTemperatureRange',
-  'flightDate', 'lockoutTime', 'trailerNumber', 'doorNumber', 'truckType',
+  'isHazmat', 'hazmatClass',
+  'flightDate', 'flightEta', 'lockoutTime', 'trailerNumber', 'doorNumber', 'truckType',
   'pickupReadyAt', 'deliveryAppointmentAt',
   'airlineId', 'warehouseId',
 ];
@@ -88,6 +92,46 @@ function normalizeShipmentDates(data) {
   return data;
 }
 
+/**
+ * Automated storage-fee days-over calculation.
+ * Days accrue from the calendar day AFTER lastFreeDay through today (inclusive).
+ * Returns 0 when lastFreeDay is missing or still in the future.
+ */
+function computeStorageFeeDaysOver(lastFreeDay) {
+  if (!lastFreeDay) return 0;
+  const lfd = new Date(lastFreeDay);
+  if (Number.isNaN(lfd.getTime())) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  lfd.setHours(0, 0, 0, 0);
+  if (today <= lfd) return 0;
+  return Math.ceil((today.getTime() - lfd.getTime()) / (1000 * 3600 * 24));
+}
+
+/**
+ * Apply automated storage fee fields onto a shipment (or create/update payload).
+ * - Recalculates storageFeeDaysOver from lastFreeDay
+ * - Ensures numeric defaults for rate / days
+ * - Adds storageFeeTotal = rate × days (display-only; not a DB column)
+ */
+function applyStorageFeeCalculation(shipmentOrData, { includeTotal = true } = {}) {
+  const out = { ...shipmentOrData };
+  if (out.type === 'Import' || out.lastFreeDay) {
+    out.storageFeeDaysOver = computeStorageFeeDaysOver(out.lastFreeDay);
+  }
+  if (out.storageFeeDaysOver == null || out.storageFeeDaysOver === '') {
+    out.storageFeeDaysOver = 0;
+  }
+  if (out.storageFeePerDay == null || out.storageFeePerDay === '') {
+    out.storageFeePerDay = 0;
+  }
+  if (includeTotal) {
+    out.storageFeeTotal =
+      (Number(out.storageFeePerDay) || 0) * (Number(out.storageFeeDaysOver) || 0);
+  }
+  return out;
+}
+
 // GET all shipments with advanced filtering
 router.get('/', async (req, res) => {
   try {
@@ -132,15 +176,18 @@ router.get('/', async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
     
-    // Add computed fields
-    const enriched = shipments.map(s => ({
-      ...s,
-      awbDisplay: s.airline?.awbPrefix && s.airwaybillNumber 
-        ? `${s.airline.awbPrefix}-${s.airwaybillNumber}`
-        : s.airwaybillNumber,
-      storageFeeTotal: (s.storageFeePerDay || 0) * (s.storageFeeDaysOver || 0)
-    }));
-    
+    // Live storage-fee calculation + display fields (days-over always current)
+    const enriched = shipments.map((s) => {
+      const withFees = applyStorageFeeCalculation(s);
+      return {
+        ...withFees,
+        awbDisplay:
+          s.airline?.awbPrefix && s.airwaybillNumber
+            ? `${s.airline.awbPrefix}-${s.airwaybillNumber}`
+            : s.airwaybillNumber,
+      };
+    });
+
     res.json(enriched);
   } catch (err) {
     console.error('Error fetching shipments:', err);
@@ -163,14 +210,16 @@ router.get('/:id', async (req, res) => {
       }
     });
     if (!shipment) return res.status(404).json({ message: 'Shipment not found' });
-    
+
+    const withFees = applyStorageFeeCalculation(shipment);
     const enriched = {
-      ...shipment,
-      awbDisplay: shipment.airline?.awbPrefix && shipment.airwaybillNumber 
-        ? `${shipment.airline.awbPrefix}-${shipment.airwaybillNumber}`
-        : shipment.airwaybillNumber
+      ...withFees,
+      awbDisplay:
+        shipment.airline?.awbPrefix && shipment.airwaybillNumber
+          ? `${shipment.airline.awbPrefix}-${shipment.airwaybillNumber}`
+          : shipment.airwaybillNumber,
     };
-    
+
     res.json(enriched);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -178,7 +227,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST create shipment
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('shipments', 'full'), async (req, res) => {
   try {
     const data = sanitizeShipmentInput(req.body);
     normalizeShipmentDates(data);
@@ -200,39 +249,30 @@ router.post('/', async (req, res) => {
         data.lockoutTime = new Date(flightDate.getTime() - (airline.defaultCutoffHours * 3600000));
       }
     }
-    
-    // Calculate storage fee days over for imports
-    if (data.type === 'Import' && data.lastFreeDay) {
-      const lastFreeDay = new Date(data.lastFreeDay);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      lastFreeDay.setHours(0, 0, 0, 0);
-      if (today > lastFreeDay) {
-        const diffTime = today.getTime() - lastFreeDay.getTime();
-        data.storageFeeDaysOver = Math.ceil(diffTime / (1000 * 3600 * 24));
-      } else {
-        data.storageFeeDaysOver = 0;
-      }
-    }
-    
+
+    // Automated storage fee days-over (and numeric defaults)
+    Object.assign(data, applyStorageFeeCalculation(data, { includeTotal: false }));
+
     // Ensure default values
     if (!data.weightUnit) data.weightUnit = 'lb';
-    if (!data.storageFeeDaysOver) data.storageFeeDaysOver = 0;
-    if (!data.storageFeePerDay) data.storageFeePerDay = 0;
     if (!data.terminalFee) data.terminalFee = 0;
     if (!data.pmcCount) data.pmcCount = 0;
     if (!data.isGDP) data.isGDP = false;
-    
+
     const createData = {
       ...data,
       // Ensure null values for optional fields
       airwaybillNumber: data.airwaybillNumber || null,
       ordNumber: data.ordNumber || null,
+      originCity: data.originCity || null,
+      flightNumber: data.flightNumber || null,
       trailerNumber: data.trailerNumber || null,
       doorNumber: data.doorNumber || null,
       truckType: data.truckType || null,
       gdpTemperatureRange: data.gdpTemperatureRange || null
     };
+    // storageFeeTotal is computed-only — never write it to Prisma
+    delete createData.storageFeeTotal;
 
     const shipment = await prisma.shipment.create({
       data: mapRelationIdsToConnect(createData),
@@ -245,14 +285,15 @@ router.post('/', async (req, res) => {
         }
       }
     });
-    
-    const enriched = {
+
+    const enriched = applyStorageFeeCalculation({
       ...shipment,
-      awbDisplay: shipment.airline?.awbPrefix && shipment.airwaybillNumber 
-        ? `${shipment.airline.awbPrefix}-${shipment.airwaybillNumber}`
-        : shipment.airwaybillNumber
-    };
-    
+      awbDisplay:
+        shipment.airline?.awbPrefix && shipment.airwaybillNumber
+          ? `${shipment.airline.awbPrefix}-${shipment.airwaybillNumber}`
+          : shipment.airwaybillNumber,
+    });
+
     res.status(201).json(enriched);
   } catch (err) {
     console.error('Error creating shipment:', err);
@@ -261,23 +302,23 @@ router.post('/', async (req, res) => {
 });
 
 // PUT update shipment
-router.put('/:id', async (req, res) => {
+router.put('/:id', requirePermission('shipments', 'full'), async (req, res) => {
   try {
     const data = sanitizeShipmentInput(req.body);
     normalizeShipmentDates(data);
     const shipmentId = req.params.id;
     
-    // Get existing shipment to check type
+    // Get existing shipment for type + lastFreeDay (needed for fee recalculation)
     const existing = await prisma.shipment.findUnique({
       where: { id: shipmentId },
-      select: { type: true }
+      select: { type: true, lastFreeDay: true, storageFeePerDay: true }
     });
-    
+
     if (!existing) {
       return res.status(404).json({ message: 'Shipment not found' });
     }
     if (existing.type === 'Export') data.doorNumber = null;
-    
+
     // Handle AWB with airline prefix for BOTH import and export
     if (data.airlineId && data.airwaybillNumber) {
       const airline = await getAirlineDetails(data.airlineId);
@@ -285,7 +326,7 @@ router.put('/:id', async (req, res) => {
         data.airwaybillNumber = normalizeAwb(airline.awbPrefix, data.airwaybillNumber);
       }
     }
-    
+
     // Calculate lockout time for exports
     if (existing.type === 'Export' && data.flightDate && data.airlineId) {
       const airline = await getAirlineDetails(data.airlineId);
@@ -294,28 +335,29 @@ router.put('/:id', async (req, res) => {
         data.lockoutTime = new Date(flightDate.getTime() - (airline.defaultCutoffHours * 3600000));
       }
     }
-    
-    // Calculate storage fee days over for imports
-    if (existing.type === 'Import' && data.lastFreeDay) {
-      const lastFreeDay = new Date(data.lastFreeDay);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      lastFreeDay.setHours(0, 0, 0, 0);
-      if (today > lastFreeDay) {
-        const diffTime = today.getTime() - lastFreeDay.getTime();
-        data.storageFeeDaysOver = Math.ceil(diffTime / (1000 * 3600 * 24));
-      } else {
-        data.storageFeeDaysOver = 0;
-      }
+
+    // Automated storage fee: always refresh days-over from LFD (payload or existing)
+    const feeSource = {
+      type: data.type || existing.type,
+      lastFreeDay:
+        data.lastFreeDay !== undefined ? data.lastFreeDay : existing.lastFreeDay,
+      storageFeePerDay:
+        data.storageFeePerDay !== undefined
+          ? data.storageFeePerDay
+          : existing.storageFeePerDay,
+    };
+    const feeFields = applyStorageFeeCalculation(feeSource, { includeTotal: false });
+    data.storageFeeDaysOver = feeFields.storageFeeDaysOver;
+    if (data.storageFeePerDay === undefined) {
+      data.storageFeePerDay = feeFields.storageFeePerDay;
     }
-    
+    delete data.storageFeeTotal;
+
     // Ensure default values
-    if (!data.storageFeeDaysOver) data.storageFeeDaysOver = 0;
-    if (!data.storageFeePerDay) data.storageFeePerDay = 0;
-    if (!data.terminalFee) data.terminalFee = 0;
-    if (!data.pmcCount) data.pmcCount = 0;
-    if (!data.isGDP) data.isGDP = false;
-    
+    if (!data.terminalFee && data.terminalFee !== 0) data.terminalFee = 0;
+    if (!data.pmcCount && data.pmcCount !== 0) data.pmcCount = 0;
+    if (data.isGDP === undefined) data.isGDP = false;
+
     const shipment = await prisma.shipment.update({
       where: { id: shipmentId },
       data: mapRelationIdsToConnect(data),
@@ -328,14 +370,15 @@ router.put('/:id', async (req, res) => {
         }
       }
     });
-    
-    const enriched = {
+
+    const enriched = applyStorageFeeCalculation({
       ...shipment,
-      awbDisplay: shipment.airline?.awbPrefix && shipment.airwaybillNumber 
-        ? `${shipment.airline.awbPrefix}-${shipment.airwaybillNumber}`
-        : shipment.airwaybillNumber
-    };
-    
+      awbDisplay:
+        shipment.airline?.awbPrefix && shipment.airwaybillNumber
+          ? `${shipment.airline.awbPrefix}-${shipment.airwaybillNumber}`
+          : shipment.airwaybillNumber,
+    });
+
     res.json(enriched);
   } catch (err) {
     if (err.code === 'P2025') {
@@ -347,7 +390,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE shipment
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requirePermission('shipments', 'full'), async (req, res) => {
   try {
     await prisma.shipment.delete({
       where: { id: req.params.id }
@@ -362,100 +405,112 @@ router.delete('/:id', async (req, res) => {
 });
 
 // BULK create shipments (for grouped truck loads)
-router.post('/bulk', async (req, res) => {
+//
+// Wrapped in a single prisma.$transaction so this is genuinely all-or-nothing.
+// Previously this looped and awaited each prisma.shipment.create() outside any
+// transaction — if shipment #5 of an 8-piece truck load failed validation
+// (bad date, duplicate AWB, whatever), shipments #1-4 were already committed
+// with no way to roll them back or even detect the group was incomplete from
+// the response. Now either the whole group + all its shipments land together,
+// or nothing does and the client gets a clean error to retry.
+//
+// Also caches airline lookups by airlineId instead of querying per shipment —
+// a bulk load is almost always all one airline, so this was hitting the DB
+// twice per shipment (once for AWB prefix, once for export lockout time) for
+// what's usually the exact same row every time.
+router.post('/bulk', requirePermission('shipments', 'full'), async (req, res) => {
   try {
     const { shipments, groupName, truckType, trailerNumber, doorNumber } = req.body;
-    
+
     if (!shipments || !shipments.length) {
       return res.status(400).json({ message: 'No shipments provided' });
     }
-    
-    // Create shipment group
-    const group = await prisma.shipmentGroup.create({
-      data: {
-        name: groupName || `TRUCK-${Date.now()}`,
-        type: shipments[0].type,
-        truckType,
-        trailerNumber,
-        doorNumber
-      }
-    });
-    
-    // Create each shipment and link to group
-    const created = [];
-    for (const shipmentData of shipments) {
-      const data = sanitizeShipmentInput(shipmentData);
-      normalizeShipmentDates(data);
-      if (data.type === 'Export') data.doorNumber = null;
-      
-      // Handle AWB with airline prefix for BOTH import and export
-      if (data.airlineId && data.airwaybillNumber) {
-        const airline = await getAirlineDetails(data.airlineId);
-        if (airline && airline.awbPrefix) {
-          data.airwaybillNumber = normalizeAwb(airline.awbPrefix, data.airwaybillNumber);
-        }
-      }
-      
-      // Calculate lockout time for exports
-      if (data.type === 'Export' && data.flightDate && data.airlineId) {
-        const airline = await getAirlineDetails(data.airlineId);
-        if (airline) {
-          const flightDate = new Date(data.flightDate);
-          data.lockoutTime = new Date(flightDate.getTime() - (airline.defaultCutoffHours * 3600000));
-        }
-      }
-      
-      // Calculate storage fee days over for imports
-      if (data.type === 'Import' && data.lastFreeDay) {
-        const lastFreeDay = new Date(data.lastFreeDay);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        lastFreeDay.setHours(0, 0, 0, 0);
-        if (today > lastFreeDay) {
-          const diffTime = today.getTime() - lastFreeDay.getTime();
-          data.storageFeeDaysOver = Math.ceil(diffTime / (1000 * 3600 * 24));
-        } else {
-          data.storageFeeDaysOver = 0;
-        }
-      }
-      
-      // Ensure default values
-      if (!data.weightUnit) data.weightUnit = 'lb';
-      if (!data.storageFeeDaysOver) data.storageFeeDaysOver = 0;
-      if (!data.storageFeePerDay) data.storageFeePerDay = 0;
-      if (!data.terminalFee) data.terminalFee = 0;
-      if (!data.pmcCount) data.pmcCount = 0;
-      if (!data.isGDP) data.isGDP = false;
-      
-      const createData = {
-        ...data,
-        airwaybillNumber: data.airwaybillNumber || null,
-        ordNumber: data.ordNumber || null,
-        trailerNumber: data.trailerNumber || null,
-        doorNumber: data.doorNumber || null,
-        truckType: data.truckType || null,
-        gdpTemperatureRange: data.gdpTemperatureRange || null
-      };
 
-      const createdShipment = await prisma.shipment.create({
-        data: mapRelationIdsToConnect(createData),
-        include: {
-          airline: true,
-          warehouse: true
-        }
-      });
-      
-      // Link to group
-      await prisma.shipmentGroupShipment.create({
-        data: {
-          shipmentId: createdShipment.id,
-          shipmentGroupId: group.id
-        }
-      });
-      
-      created.push(createdShipment);
+    const airlineCache = new Map(); // airlineId -> { awbPrefix, defaultCutoffHours } | null
+    async function getAirlineCached(airlineId) {
+      if (!airlineId) return null;
+      if (airlineCache.has(airlineId)) return airlineCache.get(airlineId);
+      const airline = await getAirlineDetails(airlineId);
+      airlineCache.set(airlineId, airline);
+      return airline;
     }
-    
+
+    const { group, created } = await prisma.$transaction(async (tx) => {
+      const group = await tx.shipmentGroup.create({
+        data: {
+          name: groupName || `TRUCK-${Date.now()}`,
+          type: shipments[0].type,
+          truckType,
+          trailerNumber,
+          doorNumber
+        }
+      });
+
+      const created = [];
+      for (const shipmentData of shipments) {
+        const data = sanitizeShipmentInput(shipmentData);
+        normalizeShipmentDates(data);
+        if (data.type === 'Export') data.doorNumber = null;
+
+        // Handle AWB with airline prefix for BOTH import and export
+        if (data.airlineId && data.airwaybillNumber) {
+          const airline = await getAirlineCached(data.airlineId);
+          if (airline && airline.awbPrefix) {
+            data.airwaybillNumber = normalizeAwb(airline.awbPrefix, data.airwaybillNumber);
+          }
+        }
+
+        // Calculate lockout time for exports
+        if (data.type === 'Export' && data.flightDate && data.airlineId) {
+          const airline = await getAirlineCached(data.airlineId);
+          if (airline) {
+            const flightDate = new Date(data.flightDate);
+            data.lockoutTime = new Date(flightDate.getTime() - (airline.defaultCutoffHours * 3600000));
+          }
+        }
+
+        // Automated storage fee days-over
+        Object.assign(data, applyStorageFeeCalculation(data, { includeTotal: false }));
+
+        // Ensure default values
+        if (!data.weightUnit) data.weightUnit = 'lb';
+        if (!data.terminalFee) data.terminalFee = 0;
+        if (!data.pmcCount) data.pmcCount = 0;
+        if (!data.isGDP) data.isGDP = false;
+
+        const createData = {
+          ...data,
+          airwaybillNumber: data.airwaybillNumber || null,
+          ordNumber: data.ordNumber || null,
+          trailerNumber: data.trailerNumber || null,
+          doorNumber: data.doorNumber || null,
+          truckType: data.truckType || null,
+          gdpTemperatureRange: data.gdpTemperatureRange || null
+        };
+        delete createData.storageFeeTotal;
+
+        const createdShipment = await tx.shipment.create({
+          data: mapRelationIdsToConnect(createData),
+          include: {
+            airline: true,
+            warehouse: true
+          }
+        });
+
+        // Link to group
+        await tx.shipmentGroupShipment.create({
+          data: {
+            shipmentId: createdShipment.id,
+            shipmentGroupId: group.id
+          }
+        });
+
+        created.push(applyStorageFeeCalculation(createdShipment));
+      }
+
+      return { group, created };
+    });
+
     res.status(201).json({
       message: `Created ${created.length} shipments in group ${group.name}`,
       group,
@@ -468,3 +523,4 @@ router.post('/bulk', async (req, res) => {
 });
 
 module.exports = router;
+

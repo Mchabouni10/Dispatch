@@ -5,6 +5,24 @@ const path = require('path');
 const fs = require('fs');
 const router = express.Router();
 const prisma = require('../lib/prisma');
+const { emit } = require('../lib/realtime');
+const requirePermission = require('../middleware/requirePermission');
+const { sanitizeDriverForRole, sanitizeDriversForRole } = require('../lib/driverFieldAccess');
+
+// Realtime broadcasts (see emit('driver:upsert', ...) below) go to every
+// socket in the 'dashboard' room at once — there's no per-listener role to
+// sanitize against like there is on a REST response. So these always use
+// the strictest tier ('VIEWER', same redaction as 'operational') regardless
+// of who triggered the update. Roles with full HR access already get the
+// unredacted record back from the REST call itself (res.json(driver)/
+// sanitizeDriverForRole(driver, req.user.role)); they just won't see pay
+// rate/license/medical fields update live in *other* users' changes without
+// a refresh. That's an acceptable tradeoff for not leaking HR data broadly.
+
+// 'view' here also admits the new 'operational' tier (Dispatcher), so they can
+// load driver lists/cards for handoff-board actions. Field-level redaction of
+// pay rate / license / personal docs happens per-response below, not here.
+router.use(requirePermission('drivers_hr', 'view'));
 
 // Photo upload setup (profile + license scan share the same folder)
 const uploadDir = path.join(__dirname, '..', 'uploads', 'drivers');
@@ -14,7 +32,11 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
-    const kind = req.path.includes('license-photo') ? 'license' : 'photo';
+    let kind = 'photo';
+    if (req.path.includes('license-photo')) kind = 'license';
+    else if (req.path.includes('medical-photo')) kind = 'medical';
+    else if (req.path.includes('airport-badge-photo')) kind = 'badge';
+    else if (req.path.includes('passport-photo')) kind = 'passport';
     cb(null, `${req.params.id}-${kind}-${Date.now()}${ext}`);
   }
 });
@@ -173,7 +195,7 @@ router.get('/', async (req, res) => {
       where: filter,
       orderBy: { name: 'asc' },
     });
-    res.json(drivers);
+    res.json(sanitizeDriversForRole(drivers, req.user.role));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -186,7 +208,7 @@ router.get('/:id', async (req, res) => {
       where: { id: req.params.id },
     });
     if (!driver) return res.status(404).json({ message: 'Driver not found' });
-    res.json(driver);
+    res.json(sanitizeDriverForRole(driver, req.user.role));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -270,9 +292,9 @@ router.get('/:id/history', async (req, res) => {
     });
 
     res.json({
-      driver: { 
-        id: driver.id, 
-        name: driver.name, 
+      driver: {
+        id: driver.id,
+        name: driver.name,
         employeeId: driver.employeeId,
         photo: driver.photo,
       },
@@ -294,7 +316,7 @@ router.get('/:id/history', async (req, res) => {
 });
 
 // POST create driver
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('drivers_hr', 'full'), async (req, res) => {
   try {
     const data = normalizeDriverPayload({ ...req.body });
 
@@ -318,6 +340,7 @@ router.post('/', async (req, res) => {
     const driver = await prisma.driver.create({
       data,
     });
+    emit('driver:upsert', sanitizeDriverForRole(driver, 'VIEWER'));
     res.status(201).json(driver);
   } catch (err) {
     if (err.code === 'P2002') {
@@ -330,7 +353,9 @@ router.post('/', async (req, res) => {
 });
 
 // PUT update driver
-router.put('/:id', async (req, res) => {
+// Requires 'full' — a Dispatcher (operational) is intentionally blocked here,
+// so the driver card as a whole (including daysOff) stays read-only for them.
+router.put('/:id', requirePermission('drivers_hr', 'full'), async (req, res) => {
   try {
     const data = normalizeDriverPayload(req.body);
     const errors = validateDriverPayload(data, { partial: true });
@@ -348,6 +373,7 @@ router.put('/:id', async (req, res) => {
       where: { id: req.params.id },
       data,
     });
+    emit('driver:upsert', sanitizeDriverForRole(driver, 'VIEWER'));
     res.json(driver);
   } catch (err) {
     if (err.code === 'P2025') {
@@ -362,8 +388,8 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// POST upload driver profile photo
-router.post('/:id/photo', upload.single('photo'), async (req, res) => {
+// POST upload driver profile photo — requires 'full', not exposed to Dispatcher.
+router.post('/:id/photo', requirePermission('drivers_hr', 'full'), upload.single('photo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No photo uploaded' });
 
@@ -392,8 +418,9 @@ router.post('/:id/photo', upload.single('photo'), async (req, res) => {
   }
 });
 
-// POST upload scanned driver license
-router.post('/:id/license-photo', upload.single('licensePhoto'), async (req, res) => {
+// POST upload scanned driver license — requires 'full'; a license scan is exactly
+// the kind of "personal doc" a Dispatcher should never see or overwrite.
+router.post('/:id/license-photo', requirePermission('drivers_hr', 'full'), upload.single('licensePhoto'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No license scan uploaded' });
 
@@ -422,10 +449,84 @@ router.post('/:id/license-photo', upload.single('licensePhoto'), async (req, res
   }
 });
 
+/**
+ * Shared helper for optional compliance document photos.
+ * field: Prisma column name on Driver
+ * formField: multer field name
+ */
+async function uploadDriverDocPhoto(req, res, { field, formField, label }) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: `No ${label} uploaded` });
+    }
+
+    const existing = await prisma.driver.findUnique({
+      where: { id: req.params.id },
+    });
+    if (!existing) return res.status(404).json({ message: 'Driver not found' });
+
+    if (existing[field]) {
+      const oldPath = path.join(__dirname, '..', existing[field]);
+      fs.unlink(oldPath, () => {});
+    }
+
+    const filePath = `/uploads/drivers/${req.file.filename}`;
+    const driver = await prisma.driver.update({
+      where: { id: req.params.id },
+      data: { [field]: filePath },
+    });
+    res.json(driver);
+  } catch (err) {
+    if (err.code === 'P2025') {
+      return res.status(404).json({ message: 'Driver not found' });
+    }
+    res.status(400).json({ message: err.message });
+  }
+}
+
+// Optional document scans — all require 'full' (not Dispatcher).
+router.post(
+  '/:id/medical-photo',
+  requirePermission('drivers_hr', 'full'),
+  upload.single('medicalPhoto'),
+  (req, res) =>
+    uploadDriverDocPhoto(req, res, {
+      field: 'medicalCertPhoto',
+      formField: 'medicalPhoto',
+      label: 'medical card scan',
+    }),
+);
+
+router.post(
+  '/:id/airport-badge-photo',
+  requirePermission('drivers_hr', 'full'),
+  upload.single('airportBadgePhoto'),
+  (req, res) =>
+    uploadDriverDocPhoto(req, res, {
+      field: 'airportBadgePhoto',
+      formField: 'airportBadgePhoto',
+      label: 'airport badge scan',
+    }),
+);
+
+router.post(
+  '/:id/passport-photo',
+  requirePermission('drivers_hr', 'full'),
+  upload.single('passportPhoto'),
+  (req, res) =>
+    uploadDriverDocPhoto(req, res, {
+      field: 'passportPhoto',
+      formField: 'passportPhoto',
+      label: 'passport scan',
+    }),
+);
+
 // PATCH update status only
-// Also doubles as the Handoff Board's status transition endpoint (check-in / break / send home),
-// which is why it accepts the optional timestamp fields below alongside the original status/leave logic.
-router.patch('/:id/status', async (req, res) => {
+// Also doubles as the Handoff Board's status transition endpoint (check-in / break / send home).
+// Requires only 'operational' access — this is the one write action a Dispatcher
+// IS allowed to take on a driver record, since it's how they run the handoff
+// board (send home, start break, check in) without generic edit rights.
+router.patch('/:id/status', requirePermission('drivers_hr', 'operational'), async (req, res) => {
   try {
     const {
       status,
@@ -468,7 +569,8 @@ router.patch('/:id/status', async (req, res) => {
       data,
     });
     if (!driver) return res.status(404).json({ message: 'Driver not found' });
-    res.json(driver);
+    emit('driver:upsert', sanitizeDriverForRole(driver, 'VIEWER'));
+    res.json(sanitizeDriverForRole(driver, req.user.role));
   } catch (err) {
     if (err.code === 'P2025') {
       return res.status(404).json({ message: 'Driver not found' });
@@ -477,45 +579,19 @@ router.patch('/:id/status', async (req, res) => {
   }
 });
 
-// GET available drivers for dispatch
-// Includes Available / On Call, plus Break drivers whose breakUntil has passed
-// (soft-available so dispatch is not blocked waiting for a manual Handoff click).
-router.get('/available', async (req, res) => {
-  try {
-    const { vehicleType, hazmat } = req.query;
+// NOTE: a GET /available route used to live here (Available/On Call, plus
+// Break drivers whose breakUntil has passed). It was removed — it sat below
+// GET /:id, so Express always matched /available as id="available" first and
+// it 404'd on every call. It was also never called from the client: dispatch
+// computes the same "available" set client-side via isDispatchEligible in
+// useDispatchResources.js. Removed rather than fixed to avoid keeping two
+// copies of the same "what counts as available" business rule that could
+// drift apart. If a server-side available-drivers endpoint is needed later,
+// re-add it ABOVE the GET /:id route (or under a non-colliding path) and
+// point the client at it instead of duplicating the filter.
 
-    const extras = {
-      ...(hazmat === 'true' ? { hazmatCertified: true } : {}),
-      ...(vehicleType && vehicleType !== 'any'
-        ? { vehicleTypes: { has: vehicleType } }
-        : {}),
-    };
-
-    const drivers = await prisma.driver.findMany({
-      where: {
-        AND: [
-          extras,
-          {
-            OR: [
-              { status: { in: ['Available', 'On Call'] } },
-              {
-                status: 'Break',
-                breakUntil: { lte: new Date() },
-              },
-            ],
-          },
-        ],
-      },
-      orderBy: { performanceRating: 'desc' },
-    });
-    res.json(drivers);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// DELETE driver
-router.delete('/:id', async (req, res) => {
+// DELETE driver — requires 'full', not exposed to Dispatcher.
+router.delete('/:id', requirePermission('drivers_hr', 'full'), async (req, res) => {
   try {
     const driver = await prisma.driver.findUnique({
       where: { id: req.params.id },
@@ -545,3 +621,10 @@ router.delete('/:id', async (req, res) => {
 module.exports = router;
 module.exports.normalizeDriverPayload = normalizeDriverPayload;
 module.exports.validateDriverPayload = validateDriverPayload;
+
+
+
+
+
+
+

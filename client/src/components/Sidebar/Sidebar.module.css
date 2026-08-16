@@ -66,7 +66,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   padding: 0 10px;
   overflow-y: auto;
 }
@@ -74,11 +74,11 @@
 .navItem {
   display: flex;
   align-items: center;
-  gap: 24px;
-  padding: 10px 14px;
+  gap: 14px;
+  padding: 11px 14px;
   border-radius: var(--radius-md);
   color: var(--text-secondary);
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: 500;
   transition: var(--transition);
   position: relative;
@@ -108,6 +108,7 @@
   background: linear-gradient(135deg, rgba(79, 142, 247, 0.16), rgba(0, 212, 255, 0.1));
   border: 1px solid rgba(79, 142, 247, 0.25);
   box-shadow: 0 0 20px rgba(79, 142, 247, 0.12);
+  font-weight: 600;
 }
 
 .navItem.active .navIcon {
@@ -121,7 +122,7 @@
 .navIcon {
   width: 18px;
   text-align: center;
-  font-size: 14px;
+  font-size: 14.5px;
   transition: color 0.2s ease;
   flex-shrink: 0;
   position: relative;
@@ -146,19 +147,20 @@
   z-index: 1;
 }
 
+/* ── Theme toggle ─────────────────────────────────────────────────────── */
 .themeToggle {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 24px;
+  justify-content: space-between;
+  gap: 12px;
   width: calc(100% - 20px);
-  margin: 0 10px 16px;
-  padding: 10px 12px;
+  margin: 12px 10px 16px;
+  padding: 10px 12px 10px 14px;
   border-radius: var(--radius-md);
   background: var(--bg-card);
   border: 1px solid var(--border);
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   transition: var(--transition);
 }
@@ -168,25 +170,186 @@
   border-color: var(--border-hover);
 }
 
-.themeIcon {
+.themeToggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.themeToggleLabel {
+  letter-spacing: -0.1px;
+}
+
+/* Pill track that the thumb slides across */
+.themeSwitch {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(255, 179, 71, 0.16);
+  border: 1px solid rgba(255, 179, 71, 0.3);
+  transition: background 0.25s ease, border-color 0.25s ease;
+}
+
+.themeSwitchDark {
+  background: rgba(79, 142, 247, 0.18);
+  border-color: rgba(79, 142, 247, 0.32);
+}
+
+.themeSwitchIconSun,
+.themeSwitchIconMoon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+.themeSwitchIconSun {
+  left: 6px;
+  color: var(--warning);
+  opacity: 1;
+}
+
+.themeSwitchIconMoon {
+  right: 6px;
+  color: var(--accent-cyan);
+  opacity: 0.5;
+}
+
+.themeSwitchDark .themeSwitchIconSun {
+  opacity: 0.4;
+}
+
+.themeSwitchDark .themeSwitchIconMoon {
+  opacity: 1;
+}
+
+.themeSwitchThumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--warning), #ffcf80);
+  color: #40260a;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  color: var(--accent);
+  font-size: 9px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background 0.25s ease, color 0.25s ease;
 }
 
+.themeSwitchDark .themeSwitchThumb {
+  transform: translateX(20px);
+  background: linear-gradient(135deg, var(--accent), var(--accent-cyan));
+  color: #06202e;
+}
+
+/* ── Footer / account ────────────────────────────────────────────────── */
 .footer {
-  padding: 16px 20px 0;
+  padding: 16px 14px 0;
   border-top: 1px solid var(--border);
   margin-top: 8px;
 }
 
-.account { padding: 0 0 14px; }
-.accountName { color: var(--text-primary); font-size: 12px; font-weight: 700; }
-.accountEmail { margin-top: 3px; color: var(--text-muted); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.account button { margin-top: 10px; padding: 0; background: none; color: var(--accent-cyan); font-size: 11px; }
-.account button:hover { color: var(--text-primary); }
+.account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: var(--radius-md);
+  transition: var(--transition);
+}
+
+.account:hover {
+  background: var(--bg-card-hover);
+}
+
+.accountAvatar {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--accent), var(--accent-cyan));
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  box-shadow: 0 2px 8px rgba(79, 142, 247, 0.3);
+}
+
+.accountInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.accountName {
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountEmail {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logoutBtn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  transition: var(--transition);
+}
+
+.logoutBtn:hover {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.version {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 0 8px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
+.versionDot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+  flex-shrink: 0;
+}
+
+.versionNumber {
+  color: var(--text-secondary);
+}
 
 .mobileBackdrop {
   display: none;
@@ -242,4 +405,3 @@
     cursor: pointer;
   }
 }
-

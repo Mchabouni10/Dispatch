@@ -5,6 +5,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const prisma = require('../lib/prisma');
+const requirePermission = require('../middleware/requirePermission');
+router.use(requirePermission('airlines', 'view'));
 
 // Storage for airline logos
 const logoDir = path.join(__dirname, '..', 'uploads', 'airlines');
@@ -26,6 +28,35 @@ const upload = multer({
     else cb(new Error('Only PNG, JPG, WEBP or SVG images are allowed'));
   }
 });
+
+/** Only fields the Airline model accepts (avoids Prisma errors from form junk). */
+function pickAirlineData(body = {}) {
+  const data = {};
+  const str = (v) => (v == null ? v : String(v));
+  const bool = (v) => Boolean(v);
+  const int = (v) => (v === '' || v == null ? undefined : Number(v));
+
+  if (body.name !== undefined) data.name = str(body.name);
+  if (body.code !== undefined) data.code = str(body.code).toUpperCase();
+  if (body.awbPrefix !== undefined) data.awbPrefix = str(body.awbPrefix);
+  if (body.terminalAddress !== undefined) data.terminalAddress = body.terminalAddress ? str(body.terminalAddress) : null;
+  if (body.contactPhone !== undefined) data.contactPhone = body.contactPhone ? str(body.contactPhone) : null;
+  if (body.openTime !== undefined) data.openTime = body.openTime ? str(body.openTime) : null;
+  if (body.closeTime !== undefined) data.closeTime = body.closeTime ? str(body.closeTime) : null;
+  if (body.open24h !== undefined) data.open24h = bool(body.open24h);
+  if (body.daysOpen !== undefined) {
+    data.daysOpen = Array.isArray(body.daysOpen)
+      ? body.daysOpen.map(String)
+      : [];
+  }
+  if (body.defaultCutoffHours !== undefined) {
+    const n = int(body.defaultCutoffHours);
+    if (n != null && !Number.isNaN(n)) data.defaultCutoffHours = n;
+  }
+  if (body.notes !== undefined) data.notes = body.notes ? str(body.notes) : null;
+  // logoUrl is set only via POST /:id/logo — never from the JSON form body
+  return data;
+}
 
 // GET all airlines
 router.get('/', async (req, res) => {
@@ -53,28 +84,27 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST create airline
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('airlines', 'full'), async (req, res) => {
   try {
-    // Check for duplicate AWB prefix
-    if (req.body.awbPrefix) {
+    const data = pickAirlineData(req.body);
+
+    if (data.awbPrefix) {
       const existing = await prisma.airline.findUnique({
-        where: { awbPrefix: req.body.awbPrefix }
+        where: { awbPrefix: data.awbPrefix }
       });
       if (existing) {
-        return res.status(400).json({ 
-          message: `AWB prefix "${req.body.awbPrefix}" is already used by another airline` 
+        return res.status(400).json({
+          message: `AWB prefix "${data.awbPrefix}" is already used by another airline`
         });
       }
     }
 
-    const airline = await prisma.airline.create({
-      data: req.body
-    });
+    const airline = await prisma.airline.create({ data });
     res.status(201).json(airline);
   } catch (err) {
     if (err.code === 'P2002') {
-      return res.status(400).json({ 
-        message: `AWB prefix "${req.body.awbPrefix}" is already used by another airline` 
+      return res.status(400).json({
+        message: `AWB prefix "${req.body.awbPrefix}" is already used by another airline`
       });
     }
     res.status(400).json({ message: err.message });
@@ -82,26 +112,27 @@ router.post('/', async (req, res) => {
 });
 
 // PUT update airline
-router.put('/:id', async (req, res) => {
+router.put('/:id', requirePermission('airlines', 'full'), async (req, res) => {
   try {
-    // Check for duplicate AWB prefix (excluding current)
-    if (req.body.awbPrefix) {
+    const data = pickAirlineData(req.body);
+
+    if (data.awbPrefix) {
       const existing = await prisma.airline.findFirst({
         where: {
-          awbPrefix: req.body.awbPrefix,
+          awbPrefix: data.awbPrefix,
           NOT: { id: req.params.id }
         }
       });
       if (existing) {
-        return res.status(400).json({ 
-          message: `AWB prefix "${req.body.awbPrefix}" is already used by another airline` 
+        return res.status(400).json({
+          message: `AWB prefix "${data.awbPrefix}" is already used by another airline`
         });
       }
     }
 
     const airline = await prisma.airline.update({
       where: { id: req.params.id },
-      data: req.body
+      data
     });
     res.json(airline);
   } catch (err) {
@@ -109,8 +140,8 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ message: 'Airline not found' });
     }
     if (err.code === 'P2002') {
-      return res.status(400).json({ 
-        message: `AWB prefix "${req.body.awbPrefix}" is already used by another airline` 
+      return res.status(400).json({
+        message: `AWB prefix "${req.body.awbPrefix}" is already used by another airline`
       });
     }
     res.status(400).json({ message: err.message });
@@ -118,16 +149,16 @@ router.put('/:id', async (req, res) => {
 });
 
 // POST upload logo
-router.post('/:id/logo', upload.single('logo'), async (req, res) => {
+router.post('/:id/logo', requirePermission('airlines', 'full'), upload.single('logo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
-    
+
     const logoUrl = `/uploads/airlines/${req.file.filename}`;
     const airline = await prisma.airline.update({
       where: { id: req.params.id },
       data: { logoUrl }
     });
-    
+
     if (!airline) return res.status(404).json({ message: 'Airline not found' });
     res.json(airline);
   } catch (err) {
@@ -139,7 +170,7 @@ router.post('/:id/logo', upload.single('logo'), async (req, res) => {
 });
 
 // DELETE airline
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requirePermission('airlines', 'full'), async (req, res) => {
   try {
     await prisma.airline.delete({
       where: { id: req.params.id }
@@ -154,3 +185,4 @@ router.delete('/:id', async (req, res) => {
 });
 
 module.exports = router;
+

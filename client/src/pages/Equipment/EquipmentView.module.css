@@ -205,6 +205,17 @@
 }
 
 .cardActions { composes: cardActions from '../../styles/shared.module.css'; }
+.viewBtn {
+  composes: iconBtn from '../../styles/shared.module.css';
+  color: var(--text-secondary);
+  background: var(--bg-card);
+}
+.viewBtn:hover {
+  color: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  background: rgba(0, 212, 255, 0.1);
+  transform: translateY(-1px);
+}
 .editBtn { composes: editBtn from '../../styles/shared.module.css'; }
 .deleteBtn { composes: deleteBtn from '../../styles/shared.module.css'; }
 
@@ -377,6 +388,58 @@
   composes: releaseBtn;
   padding: 3px 9px;
   font-size: 10.5px;
+  margin-left: 0;
+}
+
+/* Quick in-service / out-of-service toggle — the one status-style write
+   Dispatcher is granted on Equipment (server: PATCH /equipment/:id/status,
+   'operational'-gated). Same visual language as .releaseBtn (danger for the
+   "take it out" direction), plus a success-toned variant for putting a unit
+   back in service. */
+.oosToggleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 71, 87, 0.12);
+  border: 1px solid rgba(255, 71, 87, 0.35);
+  color: var(--danger);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: var(--transition);
+  margin-left: auto;
+}
+.oosToggleBtn:hover:not(:disabled) {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.oosToggleBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.returnServiceBtn {
+  composes: oosToggleBtn;
+  background: var(--success-bg);
+  border-color: rgba(0, 208, 132, 0.35);
+  color: var(--success);
+}
+.returnServiceBtn:hover:not(:disabled) {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+}
+
+/* Compact, icon-only variants for the table row's status cell */
+.oosToggleBtnSm {
+  composes: oosToggleBtn;
+  padding: 3px 7px;
+  margin-left: 0;
+}
+.returnServiceBtnSm {
+  composes: returnServiceBtn;
+  padding: 3px 7px;
   margin-left: 0;
 }
 

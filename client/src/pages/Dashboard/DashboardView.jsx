@@ -27,6 +27,10 @@ import {
   faBoxesStacked,
   faUserCheck,
   faRoute,
+  faSnowflake,
+  faWarehouse,
+  faBuildingCircleCheck,
+  faStopwatch,
 } from "@fortawesome/free-solid-svg-icons";
 import { io } from "socket.io-client";
 import {
@@ -34,6 +38,7 @@ import {
   getDrivers,
   getShipments,
   getEquipment,
+  getAuthToken,
 } from "../../api/api.js";
 import StatusBadge from "../../components/StatusBadge/StatusBadge.jsx";
 import styles from "./DashboardView.module.css";
@@ -43,6 +48,224 @@ const SOCKET_URL =
   (typeof import.meta !== "undefined" && import.meta.env?.VITE_SOCKET_URL) ||
   (typeof process !== "undefined" && process.env?.REACT_APP_SOCKET_URL) ||
   "";
+
+// Theme palette pulled from DashboardView.module.css CSS variables so chart
+// colors stay in sync with the rest of the ops-board system.
+const COLOR = {
+  cyan: "#00D4FF",
+  success: "#00D084",
+  warning: "#FFB347",
+  danger: "#FF4757",
+  purple: "#7C5CBF",
+  purpleLight: "#D6B7FF",
+  muted: "#5B6472",
+};
+
+const STATUS_COLORS = {
+  Pending: COLOR.warning,
+  Assigned: COLOR.cyan,
+  "In Transit": COLOR.purple,
+  Completed: COLOR.success,
+  Delivered: COLOR.success,
+  Cancelled: COLOR.muted,
+};
+
+function statusColor(name, i) {
+  return (
+    STATUS_COLORS[name] ||
+    [COLOR.cyan, COLOR.purple, COLOR.warning, COLOR.success, COLOR.muted][
+      i % 5
+    ]
+  );
+}
+
+// Abstract internal coordinate width. The <svg> stretches this to the
+// container's real width via preserveAspectRatio="none", so we never need
+// to measure the container in JS — but height is a literal pixel value
+// (never "100%"), which is what keeps the chart from inflating to match
+// the panel's aspect ratio. That inflation was the "ugly chart" bug.
+const CHART_UNITS = 1000;
+
+function niceAxisMax(value) {
+  if (value <= 4) return 4;
+  const pow = Math.pow(10, Math.floor(Math.log10(value)));
+  const step = value / pow <= 2 ? 0.5 * pow : value / pow <= 5 ? pow : 2 * pow;
+  return Math.ceil(value / step) * step;
+}
+
+function SimpleAreaChart({ data, series, height = 240 }) {
+  if (!data?.length) {
+    return (
+      <div
+        style={{
+          height,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "var(--text-muted)",
+          fontSize: 13,
+        }}
+      >
+        No trend data yet
+      </div>
+    );
+  }
+
+  const padTop = 16;
+  const padBottom = 28;
+  const padLeft = 34;
+  const padRight = 10;
+  const plotWidth = CHART_UNITS - padLeft - padRight;
+  const plotHeight = height - padTop - padBottom;
+
+  const rawMax = Math.max(
+    0,
+    ...data.flatMap((entry) => series.map((s) => Number(entry[s.key]) || 0)),
+  );
+  const maxValue = niceAxisMax(rawMax);
+
+  const x = (index) =>
+    padLeft + (index / Math.max(1, data.length - 1)) * plotWidth;
+  const y = (value) =>
+    padTop + (1 - (maxValue ? value / maxValue : 0)) * plotHeight;
+  const baseline = padTop + plotHeight;
+
+  const buildPath = (key) => {
+    const points = data
+      .map((entry, index) => {
+        const value = Number(entry[key]) || 0;
+        return `${index === 0 ? "M" : "L"} ${x(index).toFixed(2)} ${y(value).toFixed(2)}`;
+      })
+      .join(" ");
+    return `${points} L ${x(data.length - 1).toFixed(2)} ${baseline} L ${x(0).toFixed(2)} ${baseline} Z`;
+  };
+
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(maxValue * f));
+
+  // Show at most ~7 x-axis labels so they never overlap regardless of how
+  // many days of data are passed in.
+  const labelStep = Math.max(1, Math.ceil(data.length / 7));
+
+  return (
+    <svg
+      viewBox={`0 0 ${CHART_UNITS} ${height}`}
+      preserveAspectRatio="none"
+      width="100%"
+      height={height}
+      role="img"
+      aria-label="Cargo flow trend"
+    >
+      {yTicks.map((tick) => (
+        <g key={tick}>
+          <line
+            x1={padLeft}
+            x2={CHART_UNITS - padRight}
+            y1={y(tick)}
+            y2={y(tick)}
+            stroke="var(--border)"
+            strokeWidth={1}
+            vectorEffect="non-scaling-stroke"
+          />
+          <text
+            x={padLeft - 8}
+            y={y(tick) + 3}
+            textAnchor="end"
+            fill="var(--text-muted)"
+            fontSize="10"
+          >
+            {tick}
+          </text>
+        </g>
+      ))}
+
+      {series.map((item) => (
+        <path
+          key={item.key}
+          d={buildPath(item.key)}
+          fill={item.fill}
+          stroke={item.stroke}
+          strokeWidth={2}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+
+      {data.map((entry, index) =>
+        index % labelStep === 0 || index === data.length - 1 ? (
+          <text
+            key={entry.label || index}
+            x={x(index)}
+            y={height - 8}
+            textAnchor="middle"
+            fill="var(--text-muted)"
+            fontSize="10"
+          >
+            {entry.label}
+          </text>
+        ) : null,
+      )}
+    </svg>
+  );
+}
+
+function SimpleDonutChart({ data, colors, size = 140 }) {
+  if (!data?.length) {
+    return (
+      <div
+        style={{
+          width: size,
+          height: size,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "var(--text-muted)",
+        }}
+      >
+        No data
+      </div>
+    );
+  }
+
+  const radius = 56;
+  const circumference = 2 * Math.PI * radius;
+  const total = data.reduce((sum, entry) => sum + (Number(entry.value) || 0), 0);
+  let offset = 0;
+
+  return (
+    <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} role="img" aria-label="Status breakdown">
+      <circle cx={size / 2} cy={size / 2} r={radius} stroke="var(--border)" strokeWidth={24} fill="none" />
+      {data.map((entry, index) => {
+        const value = Number(entry.value) || 0;
+        const length = total > 0 ? (value / total) * circumference : 0;
+        const segment = (
+          <circle
+            key={entry.name || index}
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke={colors[index] || COLOR.cyan}
+            strokeWidth={24}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={`${length} ${circumference - length}`}
+            strokeDashoffset={-offset}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+        );
+        offset += length;
+        return segment;
+      })}
+      <circle cx={size / 2} cy={size / 2} r={radius - 24} fill="var(--bg-card)" />
+      <text x={size / 2} y={size / 2 - 4} textAnchor="middle" fill="var(--text-primary)" fontSize="16" fontWeight="600">
+        {total}
+      </text>
+      <text x={size / 2} y={size / 2 + 16} textAnchor="middle" fill="var(--text-muted)" fontSize="10">
+        items
+      </text>
+    </svg>
+  );
+}
 
 function formatDate(d) {
   if (!d) return "—";
@@ -62,6 +285,10 @@ function formatTime(d) {
   });
 }
 
+function formatMoney(n) {
+  return `$${Math.round(n || 0).toLocaleString("en-US")}`;
+}
+
 function hoursUntil(dateStr) {
   if (!dateStr) return null;
   return (new Date(dateStr) - new Date()) / 3600000;
@@ -74,6 +301,12 @@ function daysUntil(dateStr) {
   const d = new Date(dateStr);
   d.setHours(0, 0, 0, 0);
   return Math.round((d - t) / 86400000);
+}
+
+function startOfDay(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
 function awbLabel(shipment) {
@@ -114,6 +347,50 @@ function CountdownChip({ hours }) {
     </span>
   );
 }
+
+/** Group a list into { name, count } buckets, sorted descending, top N. */
+function topBy(list, keyFn, labelFn, limit = 5) {
+  const m = new Map();
+  list.forEach((item) => {
+    const key = keyFn(item);
+    if (!key) return;
+    const cur = m.get(key) || { name: labelFn(item), count: 0 };
+    cur.count += 1;
+    m.set(key, cur);
+  });
+  return [...m.values()].sort((a, b) => b.count - a.count).slice(0, limit);
+}
+
+function statusCounts(list) {
+  const m = new Map();
+  list.forEach((s) => {
+    const key = s.status || "Unknown";
+    m.set(key, (m.get(key) || 0) + 1);
+  });
+  return [...m.entries()].map(([name, value]) => ({ name, value }));
+}
+
+/** Custom tooltip so it matches the dark ops-board theme instead of
+ * Recharts' default light box. */
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className={styles.chartTooltip}>
+      {label && <div className={styles.chartTooltipLabel}>{label}</div>}
+      {payload.map((p) => (
+        <div key={p.dataKey || p.name} className={styles.chartTooltipRow}>
+          <span
+            className={styles.chartTooltipDot}
+            style={{ background: p.color || p.fill }}
+          />
+          {p.name}: <strong>{p.value}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const TREND_DAYS = 14;
 
 export default function DashboardView() {
   const [trips, setTrips] = useState([]);
@@ -159,6 +436,10 @@ export default function DashboardView() {
   }, [load]);
 
   useEffect(() => {
+    // The server now rejects any socket connection that doesn't present the
+    // same Bearer token used for REST calls (see lib/realtime.js) — this was
+    // previously wide open, letting anyone subscribe to live driver/trip/
+    // shipment updates without being logged in at all.
     const socket = io(SOCKET_URL || undefined, {
       path: "/socket.io",
       transports: ["websocket", "polling"],
@@ -166,6 +447,7 @@ export default function DashboardView() {
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1500,
       reconnectionDelayMax: 10000,
+      auth: { token: getAuthToken() },
     });
     socketRef.current = socket;
 
@@ -237,6 +519,8 @@ export default function DashboardView() {
     load(true);
   };
 
+  const today = useMemo(() => startOfDay(new Date()), [lastRefresh]);
+
   const activeTrips = useMemo(
     () =>
       trips.filter((t) => t.status === "En Route" || t.status === "Scheduled"),
@@ -251,24 +535,143 @@ export default function DashboardView() {
       drivers.filter((d) => d.status === "Available" || d.status === "On Call"),
     [drivers],
   );
-  const pendingImports = useMemo(
-    () =>
-      shipments.filter((s) => s.type === "Import" && s.status === "Pending"),
+
+  const imports = useMemo(
+    () => shipments.filter((s) => s.type === "Import"),
     [shipments],
+  );
+  const exports_ = useMemo(
+    () => shipments.filter((s) => s.type === "Export"),
+    [shipments],
+  );
+  const pendingImports = useMemo(
+    () => imports.filter((s) => s.status === "Pending"),
+    [imports],
   );
   const pendingExports = useMemo(
-    () =>
-      shipments.filter((s) => s.type === "Export" && s.status === "Pending"),
-    [shipments],
+    () => exports_.filter((s) => s.status === "Pending"),
+    [exports_],
   );
 
-  const today = useMemo(() => {
-    const t = new Date();
-    t.setHours(0, 0, 0, 0);
-    return t;
-  }, [lastRefresh]);
+  const importsToday = useMemo(
+    () => imports.filter((s) => startOfDay(s.createdAt).getTime() === today.getTime()).length,
+    [imports, today],
+  );
+  const exportsToday = useMemo(
+    () => exports_.filter((s) => startOfDay(s.createdAt).getTime() === today.getTime()).length,
+    [exports_, today],
+  );
 
-  /** Unified alert stream — severity ranked for a single attention feed */
+  /** Imports vs exports volume, last TREND_DAYS days, for the flow chart. */
+  const cargoFlow = useMemo(() => {
+    const buckets = new Map();
+    const order = [];
+    for (let i = TREND_DAYS - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      order.push(key);
+      buckets.set(key, {
+        label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        imports: 0,
+        exports: 0,
+      });
+    }
+    shipments.forEach((s) => {
+      if (!s.createdAt) return;
+      const key = startOfDay(s.createdAt).toISOString().slice(0, 10);
+      const bucket = buckets.get(key);
+      if (!bucket) return;
+      if (s.type === "Import") bucket.imports += 1;
+      else if (s.type === "Export") bucket.exports += 1;
+    });
+    return order.map((k) => buckets.get(k));
+  }, [shipments, today]);
+
+  const importStatusBreakdown = useMemo(() => statusCounts(imports), [imports]);
+  const exportStatusBreakdown = useMemo(() => statusCounts(exports_), [exports_]);
+
+  const feesAtRisk = useMemo(() => {
+    let terminal = 0;
+    let storage = 0;
+    imports.forEach((s) => {
+      if (s.terminalFee > 0 && !s.terminalFeePaid) terminal += s.terminalFee;
+      if (s.storageFeePerDay > 0 && !s.storageFeePaid) {
+        storage += s.storageFeePerDay * Math.max(s.storageFeeDaysOver || 0, 0);
+      }
+    });
+    return { terminal, storage, total: terminal + storage };
+  }, [imports]);
+
+  const overdueLfdCount = useMemo(
+    () =>
+      imports.filter((s) => {
+        if (s.status !== "Pending" && s.status !== "Assigned") return false;
+        const d = daysUntil(s.lastFreeDay);
+        return d !== null && d < 0;
+      }).length,
+    [imports],
+  );
+
+  const gdpActiveCount = useMemo(
+    () =>
+      imports.filter(
+        (s) =>
+          s.isGDP && (s.status === "Pending" || s.status === "Assigned"),
+      ).length,
+    [imports],
+  );
+
+  const lockoutsSoonCount = useMemo(
+    () =>
+      exports_.filter((s) => {
+        if (s.status !== "Pending" && s.status !== "Assigned") return false;
+        const h = hoursUntil(s.lockoutTime);
+        return h !== null && h < 6;
+      }).length,
+    [exports_],
+  );
+
+  const readyToShipToday = useMemo(
+    () =>
+      exports_.filter(
+        (s) => s.flightDate && startOfDay(s.flightDate).getTime() === today.getTime(),
+      ).length,
+    [exports_, today],
+  );
+
+  const topWarehouses = useMemo(
+    () => topBy(imports, (s) => s.warehouseId, (s) => s.warehouse?.name || "Unknown"),
+    [imports],
+  );
+  const topAirlines = useMemo(
+    () => topBy(exports_, (s) => s.airlineId, (s) => s.airline?.name || "Unknown"),
+    [exports_],
+  );
+
+  const onTimeDepartureRate = useMemo(() => {
+    const withBoth = trips.filter((t) => t.startTime && t.plannedDepartureTime);
+    if (!withBoth.length) return null;
+    const onTime = withBoth.filter(
+      (t) => new Date(t.startTime) <= new Date(t.plannedDepartureTime),
+    ).length;
+    return Math.round((onTime / withBoth.length) * 100);
+  }, [trips]);
+
+  const driverAlertCount = useMemo(() => {
+    let c = 0;
+    drivers.forEach((d) => {
+      const med = daysUntil(d.medicalCertExpiration);
+      if (med !== null && med <= 30) c += 1;
+      const lic = daysUntil(d.licenseExpiration);
+      if (lic !== null && lic <= 30) c += 1;
+    });
+    return c;
+  }, [drivers]);
+
+  /** Attention feed — cargo, fees, lockouts, dispatch, and equipment only.
+   * Driver compliance (medical/license) lives on the Driver Notifications
+   * page; see driverAlertCount above for the summary chip instead. */
   const alerts = useMemo(() => {
     const list = [];
 
@@ -351,38 +754,6 @@ export default function DashboardView() {
       }
     });
 
-    drivers.forEach((d) => {
-      const med = daysUntil(d.medicalCertExpiration);
-      if (med !== null && med <= 30) {
-        list.push({
-          id: `med-${d.id}`,
-          severity: med < 0 ? "critical" : med <= 7 ? "critical" : "warning",
-          category: "Driver · DOT medical",
-          title: `${d.name} · medical ${med < 0 ? "expired" : `in ${med}d`}`,
-          body:
-            med < 0
-              ? `Expired ${Math.abs(med)} days ago`
-              : "Renew before next tractor dispatch",
-          href: "/drivers",
-          icon: faIdCard,
-        });
-      }
-      const lic = daysUntil(d.licenseExpiration);
-      if (lic !== null && lic <= 30) {
-        list.push({
-          id: `lic-${d.id}`,
-          severity: lic < 0 ? "critical" : lic <= 7 ? "critical" : "warning",
-          category: "Driver · CDL",
-          title: `${d.name} · license ${lic < 0 ? "expired" : `in ${lic}d`}`,
-          body: d.licenseClass
-            ? `Class ${d.licenseClass}`
-            : "CDL renewal needed",
-          href: "/drivers",
-          icon: faIdCard,
-        });
-      }
-    });
-
     equipment.forEach((e) => {
       const reg = daysUntil(e.registrationExpiration);
       if (reg !== null && reg <= 30) {
@@ -448,7 +819,7 @@ export default function DashboardView() {
     return list.sort(
       (a, b) => (rank[a.severity] ?? 9) - (rank[b.severity] ?? 9),
     );
-  }, [shipments, drivers, equipment, activeTrips]);
+  }, [shipments, equipment, activeTrips]);
 
   const criticalCount = alerts.filter((a) => a.severity === "critical").length;
   const warningCount = alerts.filter((a) => a.severity === "warning").length;
@@ -456,9 +827,7 @@ export default function DashboardView() {
   const completedToday = useMemo(() => {
     return trips.filter((t) => {
       if (t.status !== "Completed" || !t.finishTime) return false;
-      const f = new Date(t.finishTime);
-      f.setHours(0, 0, 0, 0);
-      return f.getTime() === today.getTime();
+      return startOfDay(t.finishTime).getTime() === today.getTime();
     }).length;
   }, [trips, today]);
 
@@ -471,7 +840,7 @@ export default function DashboardView() {
           </div>
           <h1 className={styles.pageTitle}>Dashboard</h1>
           <p className={styles.pageSub}>
-            Ground runs, cargo pressure, and compliance in one glance.
+            Import and export cargo flow, ground runs, and compliance in one glance.
           </p>
         </div>
         <div className={styles.headerRight}>
@@ -605,7 +974,7 @@ export default function DashboardView() {
               <div>
                 <div className={styles.statValue}>{pendingImports.length}</div>
                 <div className={styles.statLabel}>Import permits ready</div>
-                <div className={styles.statSub}>Unassigned cargo</div>
+                <div className={styles.statSub}>{importsToday} created today</div>
               </div>
               <Link to="/imports" className={styles.statLink}>
                 Imports <FontAwesomeIcon icon={faChevronRight} />
@@ -618,12 +987,214 @@ export default function DashboardView() {
               <div>
                 <div className={styles.statValue}>{pendingExports.length}</div>
                 <div className={styles.statLabel}>Export loads ready</div>
-                <div className={styles.statSub}>Awaiting dispatch</div>
+                <div className={styles.statSub}>{exportsToday} created today</div>
               </div>
               <Link to="/exports" className={styles.statLink}>
                 Exports <FontAwesomeIcon icon={faChevronRight} />
               </Link>
             </div>
+          </div>
+
+          {/* Cargo flow trend */}
+          <section className={styles.panel} style={{ marginBottom: 24 }}>
+            <div className={styles.panelHead}>
+              <div>
+                <h2>
+                  <FontAwesomeIcon icon={faChartPie} />
+                  Cargo flow — last {TREND_DAYS} days
+                </h2>
+                <p>New import and export permits created per day</p>
+              </div>
+              <div className={styles.chartHeadStats}>
+                <div>
+                  <strong>{onTimeDepartureRate ?? "—"}%</strong>
+                  <span>on-time departures</span>
+                </div>
+                <div>
+                  <strong>{formatMoney(feesAtRisk.total)}</strong>
+                  <span>fees at risk</span>
+                </div>
+              </div>
+            </div>
+            <ul className={styles.trendLegend}>
+              <li>
+                <span style={{ background: COLOR.warning }} />
+                Imports
+              </li>
+              <li>
+                <span style={{ background: COLOR.purpleLight }} />
+                Exports
+              </li>
+            </ul>
+            <div className={styles.chartBody}>
+              <SimpleAreaChart
+                data={cargoFlow}
+                series={[
+                  { key: "imports", stroke: COLOR.warning, fill: "rgba(255, 179, 71, 0.24)" },
+                  { key: "exports", stroke: COLOR.purpleLight, fill: "rgba(124, 92, 191, 0.20)" },
+                ]}
+                height={240}
+              />
+            </div>
+          </section>
+
+          {/* Imports / Exports deep-dive */}
+          <div className={styles.cargoGrid}>
+            <section className={styles.panel}>
+              <div className={styles.panelHead}>
+                <div>
+                  <h2>
+                    <FontAwesomeIcon icon={faPlaneArrival} />
+                    Imports snapshot
+                  </h2>
+                  <p>{imports.length} permits on file</p>
+                </div>
+                <Link to="/imports" className={styles.panelLink}>
+                  Open <FontAwesomeIcon icon={faChevronRight} />
+                </Link>
+              </div>
+
+              <div className={styles.miniStatRow}>
+                <div className={styles.miniStat}>
+                  <FontAwesomeIcon icon={faWarehouse} />
+                  <div>
+                    <strong>{overdueLfdCount}</strong>
+                    <span>over LFD</span>
+                  </div>
+                </div>
+                <div className={styles.miniStat}>
+                  <FontAwesomeIcon icon={faMoneyBillWave} />
+                  <div>
+                    <strong>{formatMoney(feesAtRisk.total)}</strong>
+                    <span>unpaid fees</span>
+                  </div>
+                </div>
+                <div className={styles.miniStat}>
+                  <FontAwesomeIcon icon={faSnowflake} />
+                  <div>
+                    <strong>{gdpActiveCount}</strong>
+                    <span>cold-chain (GDP)</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.donutRow}>
+                <SimpleDonutChart
+                  data={importStatusBreakdown}
+                  colors={importStatusBreakdown.map((entry, i) => statusColor(entry.name, i))}
+                  size={140}
+                />
+                <ul className={styles.chartLegend}>
+                  {importStatusBreakdown.map((entry, i) => (
+                    <li key={entry.name}>
+                      <span style={{ background: statusColor(entry.name, i) }} />
+                      {entry.name}
+                      <strong>{entry.value}</strong>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className={styles.panelSubhead}>Top warehouses</div>
+              <div className={styles.barList}>
+                {topWarehouses.length === 0 && (
+                  <p className={styles.barListEmpty}>No import warehouse data yet</p>
+                )}
+                {topWarehouses.map((w) => (
+                  <div key={w.name} className={styles.barListRow}>
+                    <span className={styles.barListLabel}>{w.name}</span>
+                    <div className={styles.barListTrack}>
+                      <div
+                        className={styles.barListFill}
+                        style={{
+                          width: `${(w.count / topWarehouses[0].count) * 100}%`,
+                          background: COLOR.warning,
+                        }}
+                      />
+                    </div>
+                    <span className={styles.barListCount}>{w.count}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className={styles.panel}>
+              <div className={styles.panelHead}>
+                <div>
+                  <h2>
+                    <FontAwesomeIcon icon={faPlaneDeparture} />
+                    Exports snapshot
+                  </h2>
+                  <p>{exports_.length} loads on file</p>
+                </div>
+                <Link to="/exports" className={styles.panelLink}>
+                  Open <FontAwesomeIcon icon={faChevronRight} />
+                </Link>
+              </div>
+
+              <div className={styles.miniStatRow}>
+                <div className={styles.miniStat}>
+                  <FontAwesomeIcon icon={faStopwatch} />
+                  <div>
+                    <strong>{lockoutsSoonCount}</strong>
+                    <span>lockout &lt; 6h</span>
+                  </div>
+                </div>
+                <div className={styles.miniStat}>
+                  <FontAwesomeIcon icon={faBuildingCircleCheck} />
+                  <div>
+                    <strong>{readyToShipToday}</strong>
+                    <span>flying today</span>
+                  </div>
+                </div>
+                <div className={styles.miniStat}>
+                  <FontAwesomeIcon icon={faRoute} />
+                  <div>
+                    <strong>{onTimeDepartureRate ?? "—"}%</strong>
+                    <span>on-time departure</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.donutRow}>
+                <SimpleDonutChart
+                  data={exportStatusBreakdown}
+                  colors={exportStatusBreakdown.map((entry, i) => statusColor(entry.name, i))}
+                  size={140}
+                />
+                <ul className={styles.chartLegend}>
+                  {exportStatusBreakdown.map((entry, i) => (
+                    <li key={entry.name}>
+                      <span style={{ background: statusColor(entry.name, i) }} />
+                      {entry.name}
+                      <strong>{entry.value}</strong>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className={styles.panelSubhead}>Top airlines</div>
+              <div className={styles.barList}>
+                {topAirlines.length === 0 && (
+                  <p className={styles.barListEmpty}>No export airline data yet</p>
+                )}
+                {topAirlines.map((a) => (
+                  <div key={a.name} className={styles.barListRow}>
+                    <span className={styles.barListLabel}>{a.name}</span>
+                    <div className={styles.barListTrack}>
+                      <div
+                        className={styles.barListFill}
+                        style={{
+                          width: `${(a.count / topAirlines[0].count) * 100}%`,
+                          background: COLOR.purpleLight,
+                        }}
+                      />
+                    </div>
+                    <span className={styles.barListCount}>{a.count}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
           </div>
 
           <div className={styles.mainGrid}>
@@ -635,12 +1206,21 @@ export default function DashboardView() {
                     <FontAwesomeIcon icon={faTriangleExclamation} />
                     Attention feed
                   </h2>
-                  <p>Ranked by severity — cargo, fees, compliance, late runs</p>
+                  <p>Cargo, fees, lockouts, dispatch, and equipment — ranked by severity</p>
                 </div>
                 <Link to="/calendar" className={styles.panelLink}>
                   <FontAwesomeIcon icon={faCalendarDays} /> Full calendar
                 </Link>
               </div>
+
+              {driverAlertCount > 0 && (
+                <Link to="/drivers" className={styles.driverAlertChip}>
+                  <FontAwesomeIcon icon={faIdCard} />
+                  {driverAlertCount} driver compliance alert
+                  {driverAlertCount !== 1 ? "s" : ""} — see Driver Notifications
+                  <FontAwesomeIcon icon={faChevronRight} />
+                </Link>
+              )}
 
               {alerts.length === 0 ? (
                 <div className={styles.allClear}>

@@ -54,6 +54,7 @@
 .badgeGdp { background: rgba(0,212,255,0.12); color: var(--accent-cyan); border: 1px solid rgba(0,212,255,0.28); }
 .badgeFee { background: rgba(255,71,87,0.12); color: var(--danger); border: 1px solid rgba(255,71,87,0.28); }
 .badgeOk { background: rgba(46,204,113,0.12); color: var(--success); border: 1px solid rgba(46,204,113,0.28); }
+.badgeHazmat { background: rgba(255,71,87,0.14); color: var(--danger); border: 1px solid rgba(255,71,87,0.32); }
 
 .actions { composes: actions from '../../styles/shared.module.css'; }
 .actionBtn { composes: actionBtn from '../../styles/shared.module.css'; }
@@ -91,6 +92,11 @@
 @media (max-width: 720px) {
   .toggleBtn { padding: 7px 10px; }
 }
+
+
+
+
+
 
 
 

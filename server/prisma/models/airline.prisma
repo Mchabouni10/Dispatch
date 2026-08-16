@@ -10,6 +10,8 @@ model Airline {
   openTime            String?  @db.VarChar(5)
   closeTime           String?  @db.VarChar(5)
   open24h             Boolean  @default(false)
+  /// Days the cargo station is open: MON, TUE, WED, THU, FRI, SAT, SUN
+  daysOpen            String[] @default([])
   defaultCutoffHours  Int      @default(4)
   notes               String?
   createdAt           DateTime @default(now())

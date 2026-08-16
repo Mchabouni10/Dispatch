@@ -5,8 +5,10 @@
 
 /* ── Page shell ─────────────────────────────────────────────────────────── */
 .page {
-  max-width: 1200px;
-  padding: 20px 24px 28px;
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0;
 }
 
 .header {
@@ -19,7 +21,8 @@
 }
 
 .pageTitle {
-  font-size: 26px;
+  font-size: clamp(1.5rem, 1.2rem + 0.7vw, 2rem);
+  line-height: 1.15;
   font-weight: 800;
   color: var(--text-primary);
   letter-spacing: -0.5px;
@@ -28,7 +31,8 @@
 .pageSub {
   color: var(--text-secondary);
   font-size: 13px;
-  margin-top: 4px;
+  margin-top: 6px;
+  line-height: 1.5;
 }
 
 .headerMeta {
@@ -403,7 +407,7 @@
 .table tbody tr:hover td { background: rgba(255, 255, 255, 0.03); }
 
 .table td {
-  padding: 11px 12px;
+  padding: 13px 12px;
   vertical-align: middle;
   color: var(--text-primary);
 }
@@ -576,7 +580,8 @@
 
 .input,
 .textarea {
-  padding: 10px 14px;
+  min-height: 42px;
+  padding: 10px 13px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -603,6 +608,45 @@
 
 select.input { cursor: pointer; }
 select.input option { background: var(--select-option-bg); color: var(--select-option-color); }
+
+/* ── Field-severity flags ──────────────────────────────────────────
+   Applied to a .formGroup wrapper (not the input directly) so both the
+   label and the input pick up the flagged look from one class. Driven
+   live off current form state via fieldSeverity.js — as soon as a
+   critical field is filled in, the flag clears on its own. */
+.formGroupCritical .label {
+  color: var(--danger);
+}
+.formGroupCritical .label::after {
+  content: " — missing";
+  text-transform: none;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.formGroupCritical .input,
+.formGroupCritical .textarea {
+  border-color: var(--danger);
+  background: var(--danger-bg);
+}
+.formGroupCritical .input:focus,
+.formGroupCritical .textarea:focus {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(255, 71, 87, 0.15);
+}
+
+.formGroupTolerant .label {
+  color: var(--warning);
+}
+.formGroupTolerant .label::after {
+  content: " — not found";
+  text-transform: none;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.formGroupTolerant .input,
+.formGroupTolerant .textarea {
+  border-color: var(--warning);
+}
 
 .checkboxLabel {
   display: flex;
@@ -838,7 +882,7 @@ select.input option { background: var(--select-option-bg); color: var(--select-o
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
-  .page { padding: 12px 10px 24px; }
+  .page { padding: 0; }
   .header { flex-direction: column; align-items: stretch; gap: 12px; }
   .pageTitle { font-size: 22px; }
   .formGrid { grid-template-columns: 1fr; gap: 12px; }

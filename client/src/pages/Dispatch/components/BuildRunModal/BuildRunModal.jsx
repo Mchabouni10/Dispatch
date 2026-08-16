@@ -8,6 +8,7 @@ import {
   faLocationDot,
   faPlaneArrival,
   faPlaneDeparture,
+  faTriangleExclamation,
   faTruck,
   faUserPlus,
 } from "@fortawesome/free-solid-svg-icons";
@@ -22,6 +23,13 @@ import {
   detectWarehouseFromShipments,
   toDatetimeLocal,
 } from "../../utils/dispatchHelpers.js";
+import {
+  driverIneligibleReason,
+  getRequiredCertifications,
+  isDriverCertifiedForShipments,
+  isDriverLicensedForEquipment,
+  isTrailerPairingValid,
+} from "../../utils/dispatchEligibility.js";
 import { DOOR_OPTIONS } from "../../utils/dispatchConstants.js";
 import formStyles from "../../shared/FormControls.module.css";
 import DateTimePicker, { toLocalISO } from "../../../../styles/Datetimepicker.jsx";
@@ -170,6 +178,90 @@ export default function BuildRunModal({
   const selectedShipments = manifestOptions.filter((s) =>
     form.shipments.includes(s.id),
   );
+
+  // ─── Eligibility filtering ──────────────────────────────────────
+  // Cross-checks driver ↔ truck ↔ trailer ↔ manifest so the three fields
+  // narrow each other down as the dispatcher fills the form, instead of
+  // letting an incompatible combination reach submit and bounce off the
+  // server's authoritative check (lib/dispatchEligibility.js on the server).
+  const requiredCerts = useMemo(
+    () => getRequiredCertifications(selectedShipments),
+    [selectedShipments],
+  );
+
+  const selectedDriver = useMemo(
+    () => drivers.find((d) => d.id === form.driver) || null,
+    [drivers, form.driver],
+  );
+
+  const selectedTruck = useMemo(() => {
+    const pool = editingTrip?.truck
+      ? [editingTrip.truck, ...truckOptions]
+      : truckOptions;
+    return pool.find((t) => t.id === form.truck) || null;
+  }, [truckOptions, editingTrip, form.truck]);
+
+  // Drivers filtered to only those certified for this manifest's hazmat/GDP
+  // requirements AND (once a truck is picked) licensed for that truck.
+  const eligibleDriverOptions = useMemo(
+    () =>
+      driverOptions.filter(
+        (d) =>
+          isDriverCertifiedForShipments(d, selectedShipments) &&
+          (!selectedTruck || isDriverLicensedForEquipment(d, selectedTruck)),
+      ),
+    [driverOptions, selectedShipments, selectedTruck],
+  );
+  const hiddenDriverCount = driverOptions.length - eligibleDriverOptions.length;
+
+  // Real, per-driver reasons for anyone the filter above hid — instead of
+  // guessing from which requirements exist at all (hazmat/gdp/license can
+  // each be true without being the reason a *specific* driver disappeared),
+  // this asks driverIneligibleReason() what actually disqualified them and
+  // groups drivers by that exact reason so the banner never overstates or
+  // misattributes why the list emptied out.
+  const hiddenDriverReasons = useMemo(() => {
+    const hidden = driverOptions.filter(
+      (d) => !eligibleDriverOptions.some((e) => e.id === d.id),
+    );
+    const counts = new Map();
+    hidden.forEach((d) => {
+      const reason =
+        driverIneligibleReason(d, {
+          shipments: selectedShipments,
+          truck: selectedTruck,
+        }) || "not eligible for this combination";
+      counts.set(reason, (counts.get(reason) || 0) + 1);
+    });
+    return Array.from(counts.entries()).map(([reason, count]) => ({
+      reason,
+      count,
+    }));
+  }, [driverOptions, eligibleDriverOptions, selectedShipments, selectedTruck]);
+
+  // Trucks filtered to only what the selected driver's license class covers.
+  const eligibleTruckOptions = useMemo(
+    () =>
+      truckOptions.filter(
+        (t) => !selectedDriver || isDriverLicensedForEquipment(selectedDriver, t),
+      ),
+    [truckOptions, selectedDriver],
+  );
+  const hiddenTruckCount = truckOptions.length - eligibleTruckOptions.length;
+
+  // A trailer can only ride behind a Tractor, and only if the driver is
+  // trailer-eligible — otherwise there's nothing valid to offer at all.
+  const trailerPairingAllowed = isTrailerPairingValid(selectedDriver, selectedTruck);
+  const eligibleTrailerOptions = trailerPairingAllowed ? trailerOptions : [];
+
+  // If the truck/driver combo stops supporting a trailer (e.g. dispatcher
+  // switches from a Tractor to a Straight Truck), drop whatever trailer was
+  // selected instead of silently submitting an invalid combination.
+  useEffect(() => {
+    if (!trailerPairingAllowed && form.trailer) {
+      setForm((f) => ({ ...f, trailer: "" }));
+    }
+  }, [trailerPairingAllowed, form.trailer, setForm]);
 
   const routeFromPermit = useMemo(() => {
     if (selectedShipments.length === 0)
@@ -387,12 +479,33 @@ export default function BuildRunModal({
               onChange={(e) => selectDriver(e.target.value)}
             >
               <option value="">Select driver</option>
-              {driverOptions.map((d) => (
+              {eligibleDriverOptions.map((d) => (
                 <option key={d.id} value={d.id}>
                   {driverOptionLabel(d)}
                 </option>
               ))}
             </select>
+            {hiddenDriverCount > 0 && (
+              <div className={styles.eligibilityWarning}>
+                <FontAwesomeIcon icon={faTriangleExclamation} />
+                <div>
+                  <strong>
+                    {hiddenDriverCount} driver
+                    {hiddenDriverCount === 1 ? "" : "s"} hidden
+                    {eligibleDriverOptions.length === 0
+                      ? " — no one currently qualifies for this run"
+                      : ""}
+                  </strong>
+                  <ul>
+                    {hiddenDriverReasons.map(({ reason, count }) => (
+                      <li key={reason}>
+                        {count} driver{count === 1 ? "" : "s"} {reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
             {form.driver && (
               <span className={formStyles.fieldHint}>
                 {(() => {
@@ -425,11 +538,11 @@ export default function BuildRunModal({
               }
             >
               <option value="">
-                {truckOptions.length === 0
+                {eligibleTruckOptions.length === 0
                   ? "No available power units"
                   : "Select in-service power unit"}
               </option>
-              {truckOptions.map((t) => (
+              {eligibleTruckOptions.map((t) => (
                 <option key={t.id} value={t.id}>
                   {truckOptionLabel(t)}
                 </option>
@@ -447,6 +560,13 @@ export default function BuildRunModal({
               <span className={formStyles.fieldHintGood}>
                 Matches this driver's morning handoff unit.
               </span>
+            ) : hiddenTruckCount > 0 ? (
+              <span className={formStyles.fieldHint}>
+                {hiddenTruckCount} unit{hiddenTruckCount === 1 ? "" : "s"}{" "}
+                hidden — {selectedDriver?.name || "this driver"}'s license
+                class ({selectedDriver?.licenseClass || "?"}) doesn't cover
+                them.
+              </span>
             ) : null}
           </label>
 
@@ -454,12 +574,15 @@ export default function BuildRunModal({
             Trailer <span>(optional)</span>
             <select
               value={form.trailer}
+              disabled={!trailerPairingAllowed}
               onChange={(e) =>
                 setForm((f) => ({ ...f, trailer: e.target.value }))
               }
             >
-              <option value="">No trailer</option>
-              {trailerOptions.map((t) => (
+              <option value="">
+                {trailerPairingAllowed ? "No trailer" : "Not applicable"}
+              </option>
+              {eligibleTrailerOptions.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.unitNumber} · {t.equipmentType || t.category}
                   {t.capacityLbs
@@ -468,6 +591,20 @@ export default function BuildRunModal({
                 </option>
               ))}
             </select>
+            {!trailerPairingAllowed && selectedTruck && (
+              <span className={formStyles.fieldHint}>
+                {selectedTruck.equipmentType || "This unit"} doesn't pull a
+                trailer — only a Tractor does.
+              </span>
+            )}
+            {!trailerPairingAllowed &&
+              !selectedTruck &&
+              selectedDriver &&
+              selectedDriver.trailerEligible === false && (
+                <span className={formStyles.fieldHint}>
+                  {selectedDriver.name} isn't marked trailer-eligible.
+                </span>
+              )}
           </label>
 
           {form.runType === "Export" && (
@@ -535,6 +672,18 @@ export default function BuildRunModal({
             Cargo manifest{" "}
             <span>{selectedShipments.length} selected</span>
           </div>
+          {(requiredCerts.hazmat || requiredCerts.gdp) && (
+            <p className={formStyles.fieldHint}>
+              This manifest requires{" "}
+              {[
+                requiredCerts.hazmat && "a hazmat-certified driver",
+                requiredCerts.gdp && "a GDP-trained driver",
+              ]
+                .filter(Boolean)
+                .join(" and ")}
+              .
+            </p>
+          )}
           {!form.runType ? (
             <p className={formStyles.noCargo}>
               Choose Import or Export above to see matching cargo.

@@ -1,3 +1,4 @@
+//src/pages/Dispatch/hooks/useDispatchResources.js
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getTrips,
@@ -11,6 +12,7 @@ import {
   isDispatchEligible,
   isPowerUnit,
   isTrailer,
+  checkedInToday,
 } from "../utils/dispatchHelpers.js";
 
 export default function useDispatchResources() {
@@ -63,11 +65,6 @@ export default function useDispatchResources() {
     [shipments],
   );
 
-  const availableDrivers = useMemo(
-    () => drivers.filter(isDispatchEligible),
-    [drivers],
-  );
-
   const activeTrips = trips.filter(
     (t) => t.status !== "Completed" && t.status !== "Cancelled",
   );
@@ -89,6 +86,25 @@ export default function useDispatchResources() {
     });
     return map;
   }, [equipment]);
+
+  // A driver can only be dispatched if the Handoff Board has actually put a
+  // truck in their hands *today* — otherwise "available" is meaningless in
+  // the real world (no truck = no run). Requires all three:
+  //   1. isDispatchEligible  — status is Available/On Call, or their break
+  //      has ended
+  //   2. checkedInToday      — they physically checked in on the Handoff
+  //      Board today (not a stale check-in from a prior day)
+  //   3. unitAssignedToDriver[d.id] — a truck is currently assigned to them
+  const availableDrivers = useMemo(
+    () =>
+      drivers.filter(
+        (d) =>
+          isDispatchEligible(d) &&
+          checkedInToday(d) &&
+          !!unitAssignedToDriver[d.id],
+      ),
+    [drivers, unitAssignedToDriver],
+  );
 
   const trucks = useMemo(
     () =>

@@ -99,8 +99,8 @@
 .status_Sick_Leave { background: rgba(255,71,87,0.15); color: var(--danger); }
 .status_Training { background: rgba(46,204,113,0.15); color: #2ecc71; }
 .status_On_Call { background: rgba(255,193,7,0.15); color: #f39c12; }
-.status_Off_Duty { background: rgba(149,165,166,0.15); color: #95a5a6; }
-.status_Terminated { background: rgba(0,0,0,0.15); color: #7f8c8d; }
+.status_Off_Duty { background: rgba(255,71,87,0.15); color: var(--danger); }
+.status_Terminated { background: rgba(100,116,139,0.18); color: #97a7b9; border: 1px solid rgba(100,116,139,0.32); }
 
 .contact { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
 .licenseCell { font-size: 12px; color: var(--text-secondary); }
@@ -147,7 +147,95 @@
 }
 .perfRating { font-weight: 700; color: var(--text-primary); }
 
-.actions { display: flex; gap: 5px; justify-content: flex-end; }
+.actions { display: flex; gap: 5px; align-items: center; justify-content: flex-end; }
+
+.statusSelect {
+  height: 28px;
+  padding: 0 24px 0 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  max-width: 128px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237a8aa6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 7px center;
+  background-size: 12px;
+}
+
+.statusSelect:hover {
+  border-color: var(--border-hover);
+  background-color: var(--bg-card-hover);
+}
+
+.statusSelect:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79, 142, 247, 0.1);
+}
+
+.statusSelect option {
+  background: var(--select-option-bg, #10192f);
+  color: var(--select-option-color, var(--text-primary));
+}
+
+.statusSelect_Available {
+  background-color: rgba(46, 204, 113, 0.12);
+  border-color: rgba(46, 204, 113, 0.35);
+  color: var(--success);
+}
+.statusSelect_On_Trip {
+  background-color: rgba(255, 193, 7, 0.12);
+  border-color: rgba(255, 193, 7, 0.35);
+  color: var(--warning);
+}
+.statusSelect_Break {
+  background-color: rgba(79, 142, 247, 0.12);
+  border-color: rgba(79, 142, 247, 0.35);
+  color: var(--accent);
+}
+.statusSelect_Absent {
+  background-color: rgba(255, 71, 87, 0.12);
+  border-color: rgba(255, 71, 87, 0.35);
+  color: var(--danger);
+}
+.statusSelect_Vacation {
+  background-color: rgba(155, 89, 182, 0.12);
+  border-color: rgba(155, 89, 182, 0.35);
+  color: #a855f7;
+}
+.statusSelect_Sick_Leave {
+  background-color: rgba(255, 71, 87, 0.12);
+  border-color: rgba(255, 71, 87, 0.35);
+  color: var(--danger);
+}
+.statusSelect_Training {
+  background-color: rgba(46, 204, 113, 0.12);
+  border-color: rgba(46, 204, 113, 0.35);
+  color: #2ecc71;
+}
+.statusSelect_On_Call {
+  background-color: rgba(255, 193, 7, 0.12);
+  border-color: rgba(255, 193, 7, 0.35);
+  color: #f39c12;
+}
+.statusSelect_Off_Duty {
+  background-color: rgba(255, 71, 87, 0.12);
+  border-color: rgba(255, 71, 87, 0.35);
+  color: var(--danger);
+}
+.statusSelect_Terminated {
+  background-color: rgba(100, 116, 139, 0.15);
+  border-color: rgba(100, 116, 139, 0.35);
+  color: #97a7b9;
+}
+
 .actionBtn {
   width: 28px; height: 28px; border-radius: 6px;
   display: inline-flex; align-items: center; justify-content: center;
@@ -239,6 +327,22 @@
 @media (max-width: 720px) {
   .viewToggle .toggleLabel { display: none; }
   .toggleBtn { padding: 7px 10px; }
+}
+
+
+
+
+/* View action — cyan accent */
+.viewBtn {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+.viewBtn:hover {
+  color: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  background: rgba(79, 142, 247, 0.08);
+  transform: translateY(-1px);
 }
 
 

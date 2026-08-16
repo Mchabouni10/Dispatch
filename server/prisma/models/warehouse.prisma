@@ -1,16 +1,34 @@
 // prisma/models/warehouse.prisma
 model Warehouse {
-  id              String   @id @default(cuid())
-  name            String
-  address         String?
-  contactPhone    String?  @db.VarChar(20)
-  is24Hours       Boolean  @default(false)
-  daysOpen        String[] @default([])
-  openTime        String?  @db.VarChar(5)
-  closeTime       String?  @db.VarChar(5)
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  name                  String
+  address               String?
+  contactPhone          String?  @db.VarChar(20)
+  contactEmail          String?
+  is24Hours             Boolean  @default(false)
+  daysOpen              String[] @default([])
+  openTime              String?  @db.VarChar(5)
+  closeTime             String?  @db.VarChar(5)
+
+  // Photos — stored as data URLs (base64) so no extra file-storage service is required.
+  images                String[] @default([])
+
+  // Dock doors OR parking spots, expressed as a numbered range (e.g. "Doors 1–20", "Spots 20–30")
+  bayType               String?  @db.VarChar(10)   // "dock" | "parking"
+  bayFrom               Int?
+  bayTo                 Int?
+
+  // Gate / site security
+  securityType          String?  @db.VarChar(10)   // "open" | "manned" | "keypad" | "keycard"
+  appointmentRequired   Boolean  @default(false)
+  forkliftAvailable     Boolean  @default(false)
+
+  notes                 String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   shipments Shipment[]
 }
+
+// After updating this file, generate + apply the migration:
+//   npx prisma migrate dev --name add_warehouse_details

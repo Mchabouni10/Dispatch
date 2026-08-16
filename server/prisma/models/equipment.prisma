@@ -1,9 +1,9 @@
 model Equipment {
-  id                     String   @id @default(cuid())
-  unitNumber             String   @unique
+  id                     String    @id @default(cuid())
+  unitNumber             String    @unique
   equipmentType          String
   category               String
-  status                 String   @default("In Service")
+  status                 String    @default("In Service")
   licensePlate           String?
   vin                    String?
   year                   Int?
@@ -15,6 +15,9 @@ model Equipment {
   outOfServiceReason     String?
   notes                  String?
 
+  // Unit photos (paths under /uploads/equipment) — exterior, interior, damage, plate, etc.
+  images                 String[]  @default([])
+
   // ─── INSURANCE ───
   insuranceProvider      String?
   insurancePolicyNumber  String?
@@ -24,23 +27,23 @@ model Equipment {
   iftaIrpExpiration      DateTime?
 
   // ─── OWNERSHIP / LEASE ───
-  ownershipType          String   @default("Owned")
+  ownershipType          String    @default("Owned")
   leaseCompany           String?
   leaseEndDate           DateTime?
   monthlyPaymentAmount   Float?
 
   // ─── HANDOFF BOARD ───
   assignedDriverId       String?
-  assignedDriver         Driver?  @relation(fields: [assignedDriverId], references: [id])
+  assignedDriver         Driver?   @relation(fields: [assignedDriverId], references: [id])
   availableAt            DateTime?
 
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   // ─── RELATIONS ───
-  tripsAsTruck    Trip[] @relation("TruckTrips")
-  tripsAsTrailer  Trip[] @relation("TrailerTrips")
-  handoffs        EquipmentHandoff[]  // All checkout/return records
-  handoffsAsReplaced EquipmentHandoff[] @relation("ReplacedEquipment")
-  trailerHandoffs     EquipmentHandoff[] @relation("TrailerHandoff")
+  tripsAsTruck           Trip[]             @relation("TruckTrips")
+  tripsAsTrailer         Trip[]             @relation("TrailerTrips")
+  handoffs               EquipmentHandoff[]
+  handoffsAsReplaced     EquipmentHandoff[] @relation("ReplacedEquipment")
+  trailerHandoffs        EquipmentHandoff[] @relation("TrailerHandoff")
 }

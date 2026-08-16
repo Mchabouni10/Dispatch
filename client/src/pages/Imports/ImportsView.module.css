@@ -52,6 +52,9 @@
 .statDanger strong { color: var(--danger); }
 .statGdp { border-left-color: var(--accent-cyan); }
 .statGdp svg { color: var(--accent-cyan); }
+.statHazmat { border-left-color: var(--danger); background: linear-gradient(135deg, var(--danger-bg), transparent); }
+.statHazmat svg { color: var(--danger); }
+.statHazmat strong { color: var(--danger); }
 
 .toolbar { display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap; align-items: center; }
 .searchWrap { composes: searchWrap from '../../styles/shared.module.css'; }
@@ -59,6 +62,20 @@
 .searchInput { composes: searchInput from '../../styles/shared.module.css'; }
 .filterSelect { composes: filterSelect from '../../styles/shared.module.css'; }
 .filterSelect option { background: var(--select-option-bg); color: var(--select-option-color); }
+
+.dateRangeRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dateRangeRow input[type="date"] {
+  min-width: 0;
+  cursor: pointer;
+}
+.dateRangeSep {
+  color: var(--text-muted);
+  font-size: 12px;
+}
 
 .groupToggle {
   display: flex; align-items: center; gap: 8px; padding: 12px 20px;
@@ -102,7 +119,6 @@
 .paidBadge { background: var(--success); color: white; padding: 2px 8px; border-radius: 100px; font-size: 10px; margin-left: auto; }
 
 .cardHeader { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
-.awbBlock {}
 .awbLabel { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
 .awbNum { font-size: 18px; font-weight: 800; color: var(--accent-cyan); font-family: monospace; letter-spacing: 1px; }
 
@@ -150,6 +166,7 @@
 .unpaidFee { color: var(--warning); font-size: 12px; font-weight: 600; }
 
 .gdpBadge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.2); border-radius: 100px; color: var(--accent-cyan); font-size: 12px; font-weight: 600; width: fit-content; }
+.hazmatBadge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: rgba(255,71,87,0.12); border: 1px solid rgba(255,71,87,0.3); border-radius: 100px; color: var(--danger); font-size: 12px; font-weight: 700; letter-spacing: 0.3px; width: fit-content; }
 
 .notes { composes: notes from '../../styles/shared.module.css'; }
 
@@ -159,6 +176,8 @@
 .formSectionLabel:first-of-type { margin-top: 0; }
 .formGrid { composes: formGrid from '../../styles/shared.module.css'; }
 .formGroup { composes: formGroup from '../../styles/shared.module.css'; }
+.formGroupCritical { composes: formGroup formGroupCritical from '../../styles/shared.module.css'; }
+.formGroupTolerant { composes: formGroup formGroupTolerant from '../../styles/shared.module.css'; }
 .fullWidth { composes: fullWidth from '../../styles/shared.module.css'; }
 
 .label { composes: label from '../../styles/shared.module.css'; }
@@ -199,6 +218,14 @@ select.input option { background: var(--select-option-bg); color: var(--select-o
   .groupToggle { margin-left: 0; }
   .addBtn { width: 100%; justify-content: center; }
 }
+
+
+
+
+
+
+
+
 
 
 

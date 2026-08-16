@@ -1,20 +1,35 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faPlus, faPencil, faTrash, faPlane, faClock, faTag,
+  faPlus, faPencil, faTrash, faPlane, faClock, faTag, faEye,
   faDoorOpen, faDoorClosed, faInfinity, faImage,
-  faTable, faThLarge, faMapMarkerAlt, faSearch, faXmark
+  faTable, faThLarge, faMapMarkerAlt, faSearch, faXmark,
 } from '@fortawesome/free-solid-svg-icons';
 import { getAirlines, createAirline, updateAirline, deleteAirline, uploadAirlineLogo, resolveUploadUrl } from '../../api/api.js';
 import Modal from '../../components/Modal/Modal.jsx';
 import TimePicker from '../../styles/TimePicker.jsx';
+import AirlineDetailView from './AirlineDetailView.jsx';
 import styles from './AirlinesView.module.css';
 import tableStyles from './AirlinesView.table.module.css';
 import LiveClock from '../../styles/Liveclock.jsx'; // adjust path to match your folder layout
 
+const DAYS = [
+  { key: 'MON', label: 'M', full: 'Mon' },
+  { key: 'TUE', label: 'T', full: 'Tue' },
+  { key: 'WED', label: 'W', full: 'Wed' },
+  { key: 'THU', label: 'T', full: 'Thu' },
+  { key: 'FRI', label: 'F', full: 'Fri' },
+  { key: 'SAT', label: 'S', full: 'Sat' },
+  { key: 'SUN', label: 'S', full: 'Sun' },
+];
+const DAY_ORDER = DAYS.map(d => d.key);
+const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI'];
+
 const INITIAL = {
   name: '', code: '', awbPrefix: '', terminalAddress: '', contactPhone: '',
-  openTime: '08:00', closeTime: '18:00', open24h: false, defaultCutoffHours: 4, notes: ''
+  openTime: '08:00', closeTime: '18:00', open24h: false,
+  daysOpen: WEEKDAYS,
+  defaultCutoffHours: 4, notes: '',
 };
 
 const VIEW_KEY = 'airlinesViewMode';
@@ -27,9 +42,37 @@ const formatTime12h = (hhmm) => {
   return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
 };
 
+function formatDays(daysOpen = []) {
+  if (!daysOpen?.length) return 'Days not set';
+  if (daysOpen.length === 7) return 'Every day';
+  if (daysOpen.length === 5 && WEEKDAYS.every(d => daysOpen.includes(d))) return 'Weekdays';
+  const indices = daysOpen.map(d => DAY_ORDER.indexOf(d)).filter(i => i >= 0).sort((a, b) => a - b);
+  const isContiguous = indices.length > 1 && indices.every((v, i) => i === 0 || v === indices[i - 1] + 1);
+  if (isContiguous) {
+    return `${DAYS[indices[0]].full}–${DAYS[indices[indices.length - 1]].full}`;
+  }
+  return indices.map(i => DAYS[i].full).join(', ');
+}
+
+function formatHoursLabel(a) {
+  if (a.open24h) return '24/7';
+  const days = formatDays(a.daysOpen);
+  const time =
+    a.openTime && a.closeTime
+      ? `${formatTime12h(a.openTime)}–${formatTime12h(a.closeTime)}`
+      : '';
+  return [days, time].filter(Boolean).join(' • ');
+}
+
 const isOpenNow = (airline) => {
   if (airline.open24h) return true;
   if (!airline.openTime || !airline.closeTime) return false;
+
+  if (airline.daysOpen?.length) {
+    const dayKey = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][new Date().getDay()];
+    if (!airline.daysOpen.includes(dayKey)) return false;
+  }
+
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const [oh, om] = airline.openTime.split(':').map(Number);
@@ -47,6 +90,7 @@ export default function AirlinesView() {
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [editing, setEditing] = useState(null);
+  const [viewing, setViewing] = useState(null);
   const [form, setForm] = useState(INITIAL);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -54,7 +98,6 @@ export default function AirlinesView() {
   const [logoPreview, setLogoPreview] = useState('');
   const [search, setSearch] = useState('');
 
-  // View mode: 'cards' | 'table' (persisted)
   const [viewMode, setViewMode] = useState(() => {
     try {
       return localStorage.getItem(VIEW_KEY) || 'cards';
@@ -87,7 +130,8 @@ export default function AirlinesView() {
     return airlines.filter(a =>
       a.name?.toLowerCase().includes(q) ||
       a.awbPrefix?.toLowerCase().includes(q) ||
-      a.code?.toLowerCase().includes(q)
+      a.code?.toLowerCase().includes(q) ||
+      a.terminalAddress?.toLowerCase().includes(q)
     );
   }, [airlines, search]);
 
@@ -102,12 +146,19 @@ export default function AirlinesView() {
 
   const openEdit = (a) => {
     setEditing(a);
-    setForm({ ...INITIAL, ...a });
+    setForm({
+      ...INITIAL,
+      ...a,
+      daysOpen: a.daysOpen?.length ? a.daysOpen : WEEKDAYS,
+    });
     setError('');
     setLogoFile(null);
     setLogoPreview(a.logoUrl ? resolveUploadUrl(a.logoUrl) : '');
     setModalOpen(true);
   };
+
+  const openView = (a) => setViewing(a);
+  const closeView = () => setViewing(null);
 
   const closeModal = () => {
     setModalOpen(false);
@@ -115,6 +166,15 @@ export default function AirlinesView() {
     setError('');
     setLogoFile(null);
     setLogoPreview('');
+  };
+
+  const toggleDay = (key) => {
+    setForm(f => ({
+      ...f,
+      daysOpen: f.daysOpen.includes(key)
+        ? f.daysOpen.filter(d => d !== key)
+        : DAY_ORDER.filter(d => f.daysOpen.includes(d) || d === key),
+    }));
   };
 
   const handleLogoChange = (e) => {
@@ -129,9 +189,14 @@ export default function AirlinesView() {
     setSaving(true);
     setError('');
     try {
+      const payload = {
+        ...form,
+        // Keep times even when 24h so they restore if toggled off
+        daysOpen: form.open24h ? DAY_ORDER : form.daysOpen,
+      };
       const saved = editing
-        ? await updateAirline(editing.id, form)
-        : await createAirline(form);
+        ? await updateAirline(editing.id, payload)
+        : await createAirline(payload);
 
       if (logoFile && saved && saved.id) {
         await uploadAirlineLogo(saved.id, logoFile);
@@ -156,7 +221,6 @@ export default function AirlinesView() {
     }
   };
 
-  /* Shared status badge for table */
   const StatusBadge = ({ airline }) => {
     if (airline.open24h) {
       return (
@@ -175,7 +239,6 @@ export default function AirlinesView() {
     );
   };
 
-  /* ── Card view – address always visible under name ── */
   const renderCards = () => (
     <div className={styles.grid}>
       {filteredAirlines.length === 0 && (
@@ -198,13 +261,15 @@ export default function AirlinesView() {
             )}
             <div className={styles.airlineInfo}>
               <div className={styles.airlineName}>{a.name}</div>
-              {/* Address is important – always shown */}
               <div className={styles.airlineAddr} title={a.terminalAddress || undefined}>
                 <FontAwesomeIcon icon={faMapMarkerAlt} style={{ marginRight: 5, fontSize: 10, opacity: 0.7 }} />
                 {a.terminalAddress || 'No address'}
               </div>
             </div>
             <div className={styles.cardActions}>
+              <button className={styles.viewBtn} onClick={() => openView(a)} title="View">
+                <FontAwesomeIcon icon={faEye} />
+              </button>
               <button className={styles.editBtn} onClick={() => openEdit(a)} title="Edit">
                 <FontAwesomeIcon icon={faPencil} />
               </button>
@@ -225,7 +290,7 @@ export default function AirlinesView() {
               <span className={`${styles.badge} ${isOpenNow(a) ? styles.badgeOpen : styles.badgeClosed}`}>
                 <span className={`${styles.statusDot} ${isOpenNow(a) ? styles.statusDotOpen : styles.statusDotClosed}`} />
                 <FontAwesomeIcon icon={isOpenNow(a) ? faDoorOpen : faDoorClosed} />
-                {formatTime12h(a.openTime)}–{formatTime12h(a.closeTime)}
+                {formatHoursLabel(a)}
               </span>
             )}
           </div>
@@ -242,7 +307,6 @@ export default function AirlinesView() {
     </div>
   );
 
-  /* ── Table view – dedicated Address column ── */
   const renderTable = () => (
     <div className={tableStyles.tableWrap}>
       <div className={tableStyles.tableScroll}>
@@ -291,7 +355,6 @@ export default function AirlinesView() {
                       {a.awbPrefix}-
                     </span>
                   </td>
-                  {/* Address column – truncated with full text on hover */}
                   <td>
                     {a.terminalAddress ? (
                       <div className={tableStyles.address} title={a.terminalAddress}>
@@ -312,6 +375,13 @@ export default function AirlinesView() {
                   </td>
                   <td>
                     <div className={tableStyles.actions}>
+                      <button
+                        className={`${tableStyles.actionBtn} ${tableStyles.viewBtn}`}
+                        onClick={() => openView(a)}
+                        title="View"
+                      >
+                        <FontAwesomeIcon icon={faEye} />
+                      </button>
                       <button
                         className={`${tableStyles.actionBtn} ${tableStyles.editBtn}`}
                         onClick={() => openEdit(a)}
@@ -386,7 +456,7 @@ export default function AirlinesView() {
           <input
             type="text"
             className={styles.searchInput}
-            placeholder="Search by name or AWB prefix…"
+            placeholder="Search by name, code, AWB, or address…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -432,30 +502,67 @@ export default function AirlinesView() {
               <label className={styles.label}>Cutoff Hours *</label>
               <input id="al-cutoff" className={styles.input} type="number" min={1} max={24} value={form.defaultCutoffHours} onChange={e => setForm(f => ({ ...f, defaultCutoffHours: Number(e.target.value) }))} />
             </div>
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Opens *</label>
-              <TimePicker
-                value={form.openTime || null}
-                onChange={(t) => setForm(f => ({ ...f, openTime: t || '' }))}
-                placeholder="Select open time"
-                disabled={form.open24h}
-              />
-            </div>
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Closes *</label>
-              <TimePicker
-                value={form.closeTime || null}
-                onChange={(t) => setForm(f => ({ ...f, closeTime: t || '' }))}
-                placeholder="Select close time"
-                disabled={form.open24h}
-              />
-            </div>
+
+            {/* Operating hours — same system as Warehouses */}
             <div className={`${styles.formGroup} ${styles.fullWidth}`}>
-              <label className={styles.checkboxLabel}>
-                <input type="checkbox" id="al-open24h" checked={form.open24h} onChange={e => setForm(f => ({ ...f, open24h: e.target.checked }))} />
-                Open 24 Hours
+              <label className={styles.label}>Operating Hours</label>
+
+              <label className={styles.toggleRow}>
+                <input
+                  type="checkbox"
+                  id="al-open24h"
+                  className={styles.toggleInput}
+                  checked={form.open24h}
+                  onChange={e => setForm(f => ({ ...f, open24h: e.target.checked }))}
+                />
+                <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                Open 24 hours
               </label>
+
+              <div className={styles.dayPicker}>
+                <div className={styles.dayPills}>
+                  {DAYS.map(d => (
+                    <button
+                      type="button"
+                      key={d.key}
+                      className={`${styles.dayPill} ${form.daysOpen.includes(d.key) ? styles.dayPillActive : ''}`}
+                      onClick={() => toggleDay(d.key)}
+                      title={d.full}
+                      disabled={form.open24h}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+                <div className={styles.dayPresets}>
+                  <button type="button" className={styles.presetBtn} disabled={form.open24h} onClick={() => setForm(f => ({ ...f, daysOpen: DAY_ORDER }))}>Every day</button>
+                  <button type="button" className={styles.presetBtn} disabled={form.open24h} onClick={() => setForm(f => ({ ...f, daysOpen: WEEKDAYS }))}>Weekdays</button>
+                  <button type="button" className={styles.presetBtn} disabled={form.open24h} onClick={() => setForm(f => ({ ...f, daysOpen: [...WEEKDAYS, 'SAT'] }))}>Weekdays + Sat</button>
+                </div>
+              </div>
+
+              {!form.open24h && (
+                <div className={styles.timeRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.label}>Opens</label>
+                    <TimePicker
+                      value={form.openTime || null}
+                      onChange={(t) => setForm(f => ({ ...f, openTime: t || '' }))}
+                      placeholder="Select open time"
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.label}>Closes</label>
+                    <TimePicker
+                      value={form.closeTime || null}
+                      onChange={(t) => setForm(f => ({ ...f, closeTime: t || '' }))}
+                      placeholder="Select close time"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
+
             <div className={`${styles.formGroup} ${styles.fullWidth}`}>
               <label className={styles.label}>Terminal Address</label>
               <input id="al-address" className={styles.input} value={form.terminalAddress} onChange={e => setForm(f => ({ ...f, terminalAddress: e.target.value }))} placeholder="TBIT Cargo - LAX" />
@@ -499,9 +606,22 @@ export default function AirlinesView() {
           <button className={styles.deleteConfirmBtn} onClick={handleDelete} id="al-delete-confirm">Delete</button>
         </div>
       </Modal>
+
+      {/* Separated detail view */}
+      <Modal isOpen={!!viewing} onClose={closeView} title={viewing?.name || 'Airline'} size="lg">
+        <AirlineDetailView
+          airline={viewing}
+          onClose={closeView}
+          onEdit={(a) => {
+            closeView();
+            openEdit(a);
+          }}
+        />
+      </Modal>
     </div>
   );
 }
+
 
 
 

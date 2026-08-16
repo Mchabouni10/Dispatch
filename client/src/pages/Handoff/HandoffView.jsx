@@ -1,3 +1,4 @@
+//src/pages/Handoff/HandoffView.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -11,9 +12,7 @@ import {
   faCircleCheck,
   faRotateLeft,
   faTriangleExclamation,
-  faIdCard,
   faIdBadge,
-  faBell,
   faCalendarDay,
   faHistory,
   faArrowsRotate,
@@ -21,6 +20,7 @@ import {
   faCheck,
   faXmark,
   faHourglassHalf,
+  faMugHot,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   getDrivers,
@@ -33,6 +33,8 @@ import {
 import Modal from "../../components/Modal/Modal.jsx";
 import ShowingSoonSection from "./ShowingSoonSection.jsx";
 import ShiftCoverageChart from "./ShiftCoverageChart.jsx";
+import NotCheckedInColumn from "./NotCheckedInColumn.jsx";
+import DriverAvatar from "./DriverAvatar.jsx";
 import {
   BOARD_STATUSES,
   SWAP_REASONS,
@@ -149,9 +151,7 @@ export default function HandoffView() {
 
   const driversScheduledToday = useMemo(
     () =>
-      drivers.filter(
-        (d) => isScheduledToday(d) && d.shiftStart && d.shiftEnd,
-      ),
+      drivers.filter((d) => isScheduledToday(d) && d.shiftStart && d.shiftEnd),
     [drivers],
   );
 
@@ -224,6 +224,17 @@ export default function HandoffView() {
     [equipment],
   );
 
+  // Equipment that never went through a proper release (Send Home / Return
+  // Equipment) still shows assignedDriverId pointing at a driver who has
+  // since dropped off "On Shift" — invisible everywhere else on this board,
+  // so it's counted here and flagged per-card in the Not Checked In column.
+  const staleHoldCount = useMemo(
+    () =>
+      notCheckedInDrivers.filter((d) => truckFor(d.id) || trailerFor(d.id))
+        .length,
+    [notCheckedInDrivers, truckFor, trailerFor],
+  );
+
   // Drivers expected to start within the next 2 hours
   const upcomingDrivers = useMemo(() => {
     return notCheckedInDrivers
@@ -235,7 +246,9 @@ export default function HandoffView() {
           : null;
         return { driver: d, minsUntil: mins, expected };
       })
-      .filter((x) => x.minsUntil != null && x.minsUntil > 0 && x.minsUntil <= 120)
+      .filter(
+        (x) => x.minsUntil != null && x.minsUntil > 0 && x.minsUntil <= 120,
+      )
       .sort((a, b) => a.minsUntil - b.minsUntil);
   }, [notCheckedInDrivers, tick]);
 
@@ -334,9 +347,10 @@ export default function HandoffView() {
     try {
       await assignEquipment(truck.id, {
         release: true,
-        cooldownMinutes: 0,
-        reason: endShiftData.returnReason,
-        reasonNote: endShiftData.returnNote || "End of shift",
+        cooldownMinutes: 60, // same as Dispatch “Send home”
+        reason: endShiftData.returnReason || "SHIFT_END",
+        reasonNote:
+          endShiftData.returnNote || "End of shift – returning to yard",
         odometerEnd: endShiftData.odometerEnd
           ? parseInt(endShiftData.odometerEnd)
           : undefined,
@@ -572,131 +586,15 @@ export default function HandoffView() {
 
       <div className={styles.board}>
         {/* Not checked in */}
-        <section className={styles.column}>
-          <div className={styles.columnHeader}>
-            <span>Not Checked In</span>
-            <span className={styles.columnCount}>
-              {notCheckedInDrivers.length}
-            </span>
-          </div>
-          <div className={styles.cardList}>
-            {notCheckedInDrivers.length === 0 && (
-              <div className={styles.emptyState}>
-                Everyone eligible is on shift.
-              </div>
-            )}
-            {notCheckedInDrivers.map((driver) => {
-              const scheduled = isScheduledToday(driver);
-              const pastStart = minutesPastExpectedStart(driver);
-              const late = scheduled && pastStart != null;
-              const expected = shiftStartToday(driver);
-              const minsToStart = expected
-                ? Math.round((expected.getTime() - Date.now()) / 60000)
-                : null;
-              const arrivingSoon =
-                scheduled &&
-                minsToStart != null &&
-                minsToStart > 0 &&
-                minsToStart <= 60;
-
-              return (
-                <div
-                  key={driver.id}
-                  className={`${styles.card} ${styles.cardIdle} ${
-                    late ? styles.cardLate : ""
-                  } ${arrivingSoon ? styles.cardArriving : ""}`}
-                >
-                  <div className={styles.cardTop}>
-                    {driver.photo ? (
-                      <img
-                        src={driver.photo}
-                        alt={driver.name}
-                        className={styles.avatarImg}
-                      />
-                    ) : (
-                      <div className={styles.avatar}>
-                        {initials(driver.name)}
-                      </div>
-                    )}
-                    <div className={styles.driverInfo}>
-                      <div className={styles.driverName}>{driver.name}</div>
-                      <div className={styles.driverSubline}>
-                        <FontAwesomeIcon
-                          icon={faIdCard}
-                          className={styles.iconSmall}
-                        />
-                        Class {driver.licenseClass}
-                        {driver.vehicleTypes?.length > 0 && (
-                          <>
-                            <span className={styles.dot}>·</span>
-                            {driver.vehicleTypes.join(", ")}
-                          </>
-                        )}
-                        {driver.status === "On Call" && (
-                          <span className={styles.onCallBadge}>
-                            <FontAwesomeIcon icon={faBell} /> On Call
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className={styles.cardBody}>
-                    <div className={styles.scheduleRow}>
-                      <FontAwesomeIcon
-                        icon={faCalendarDay}
-                        className={styles.iconSmall}
-                      />
-                      {driver.shiftStart && driver.shiftEnd ? (
-                        <span>
-                          Shift {formatHour12(driver.shiftStart)} –{" "}
-                          {formatHour12(driver.shiftEnd)}
-                        </span>
-                      ) : (
-                        <span className={styles.textMuted}>
-                          No shift times on file
-                        </span>
-                      )}
-                    </div>
-                    {!scheduled && (
-                      <div className={styles.notScheduledTag}>
-                        Not scheduled today
-                        {driver.availableOnDaysOff
-                          ? " (willing on day off)"
-                          : ""}
-                      </div>
-                    )}
-                    {late && (
-                      <div className={styles.lateTag}>
-                        <FontAwesomeIcon icon={faTriangleExclamation} />
-                        Late by {pastStart} min
-                      </div>
-                    )}
-                    {arrivingSoon && !late && (
-                      <div className={styles.arrivingTag}>
-                        <FontAwesomeIcon icon={faHourglassHalf} />
-                        Starts in {formatDuration(minsToStart)}
-                      </div>
-                    )}
-                    {scheduled && !late && !arrivingSoon && driver.shiftStart && (
-                      <div className={styles.onTimeHint}>
-                        <FontAwesomeIcon icon={faClock} />
-                        Expected by {formatHour12(driver.shiftStart)}
-                      </div>
-                    )}
-                    <button
-                      className={styles.checkInBtn}
-                      onClick={() => openCheckIn(driver)}
-                      disabled={busyId === driver.id}
-                    >
-                      <FontAwesomeIcon icon={faKey} />
-                      Check In
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+        <NotCheckedInColumn
+          drivers={notCheckedInDrivers}
+          staleHoldCount={staleHoldCount}
+          busyId={busyId}
+          onCheckIn={openCheckIn}
+          onReleaseEquipment={setEndShiftDriver}
+          truckFor={truckFor}
+          trailerFor={trailerFor}
+        />
 
         {/* On shift */}
         <section className={styles.column}>
@@ -735,17 +633,7 @@ export default function HandoffView() {
                   } ${pastEnd ? styles.pastEndCard : ""}`}
                 >
                   <div className={styles.cardTop}>
-                    {driver.photo ? (
-                      <img
-                        src={driver.photo}
-                        alt={driver.name}
-                        className={styles.avatarImg}
-                      />
-                    ) : (
-                      <div className={styles.avatar}>
-                        {initials(driver.name)}
-                      </div>
-                    )}
+                    <DriverAvatar driver={driver} size="md" />
                     <div className={styles.driverInfo}>
                       <div className={styles.driverName}>{driver.name}</div>
                       <div className={styles.driverSubline}>
@@ -797,11 +685,14 @@ export default function HandoffView() {
                         )}
                         {lateMins != null && lateMins > 0 && (
                           <span className={styles.lateInline}>
-                            · +{lateMins}m late
+                            · +{formatDuration(lateMins)} late
                           </span>
                         )}
                         {lateMins != null && lateMins <= 0 && (
-                          <span className={styles.onTimeInline}> · on time</span>
+                          <span className={styles.onTimeInline}>
+                            {" "}
+                            · on time
+                          </span>
                         )}
                       </div>
                       {minsToEnd != null && (
@@ -859,6 +750,7 @@ export default function HandoffView() {
                           onClick={() => backToAvailable(driver)}
                           disabled={busyId === driver.id}
                         >
+                          <FontAwesomeIcon icon={faCircleCheck} />
                           {busyId === driver.id
                             ? "Updating…"
                             : "Make Available"}
@@ -870,6 +762,7 @@ export default function HandoffView() {
                             onClick={() => startBreak(driver)}
                             disabled={busyId === driver.id}
                           >
+                            <FontAwesomeIcon icon={faMugHot} />
                             Break
                           </button>
                           {truck && (
@@ -1001,9 +894,7 @@ export default function HandoffView() {
               <button
                 type="button"
                 className={`${styles.trailerOption} ${
-                  selectedTrailerId === null
-                    ? styles.trailerOptionSelected
-                    : ""
+                  selectedTrailerId === null ? styles.trailerOptionSelected : ""
                 }`}
                 onClick={() => setSelectedTrailerId(null)}
               >
@@ -1314,9 +1205,7 @@ export default function HandoffView() {
               <button
                 type="button"
                 className={`${styles.trailerOption} ${
-                  swapData.trailerId === ""
-                    ? styles.trailerOptionSelected
-                    : ""
+                  swapData.trailerId === "" ? styles.trailerOptionSelected : ""
                 }`}
                 onClick={() => setSwapData({ ...swapData, trailerId: "" })}
               >

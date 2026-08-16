@@ -166,3 +166,18 @@
 .toggleBtnActive { composes: toggleBtnActive from '../../styles/shared.module.css'; }
 .toggleLabel { composes: toggleLabel from '../../styles/shared.module.css'; }
 
+
+
+.viewBtn {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+.viewBtn:hover {
+  color: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  background: rgba(0, 212, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+

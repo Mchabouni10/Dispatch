@@ -153,6 +153,20 @@
 .editBtn { composes: actionEdit from '../../styles/shared.module.css'; }
 .deleteBtn { composes: actionDelete from '../../styles/shared.module.css'; }
 
+/* View action — cyan accent to match card viewBtn */
+.viewBtn {
+  composes: actionBtn from '../../styles/shared.module.css';
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+.viewBtn:hover {
+  color: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  background: rgba(79, 142, 247, 0.08);
+  transform: translateY(-1px);
+}
+
 .emptyRow { composes: emptyRow from '../../styles/shared.module.css'; }
 
 /* View Toggle */
@@ -160,3 +174,4 @@
 .toggleBtn { composes: toggleBtn from '../../styles/shared.module.css'; }
 .toggleBtnActive { composes: toggleBtnActive from '../../styles/shared.module.css'; }
 .toggleLabel { composes: toggleLabel from '../../styles/shared.module.css'; }
+

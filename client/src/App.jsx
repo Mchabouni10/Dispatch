@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBars, faMoon, faSun } from "@fortawesome/free-solid-svg-icons";
 import Sidebar from "./components/Sidebar/Sidebar.jsx";
@@ -16,8 +16,11 @@ import CalendarView from "./pages/Calendar/CalendarView.jsx";
 import AnalyticsView from "./pages/Analytics/AnalyticsView.jsx";
 import styles from "./App.module.css";
 import AuthView from "./pages/Auth/AuthView.jsx";
+import ForceChangePassword from "./pages/Auth/ForceChangePassword.jsx";
 import { clearAuthToken, getAuthToken, getCurrentUser } from "./api/api.js";
 import logo from "../images/app-logo.jpeg";
+import UsersView from "./pages/Users/UsersView.jsx";
+import { getPermission } from "./permissions.js";
 
 const getInitialTheme = () => {
   if (typeof window === "undefined") return "dark";
@@ -44,20 +47,46 @@ export default function App() {
 
   useEffect(() => {
     const expire = () => setUser(null);
+    // Fires if a protected call comes back 403 PASSWORD_CHANGE_REQUIRED mid-session
+    // (e.g. an admin reset this person's password while they were still logged in
+    // elsewhere) — flips the flag locally so the guard below takes over immediately,
+    // no need to log the person out and back in.
+    const forcePasswordChange = () =>
+      setUser((current) => (current ? { ...current, mustChangePassword: true } : current));
     window.addEventListener('dispatch:auth-expired', expire);
+    window.addEventListener('dispatch:password-change-required', forcePasswordChange);
     if (!getAuthToken()) {
       setCheckingAuth(false);
-      return () => window.removeEventListener('dispatch:auth-expired', expire);
+      return () => {
+        window.removeEventListener('dispatch:auth-expired', expire);
+        window.removeEventListener('dispatch:password-change-required', forcePasswordChange);
+      };
     }
     getCurrentUser()
       .then((result) => setUser(result.user))
       .catch(() => clearAuthToken())
       .finally(() => setCheckingAuth(false));
-    return () => window.removeEventListener('dispatch:auth-expired', expire);
+    return () => {
+      window.removeEventListener('dispatch:auth-expired', expire);
+      window.removeEventListener('dispatch:password-change-required', forcePasswordChange);
+    };
   }, []);
 
   if (checkingAuth) return null;
   if (!user) return <AuthView onAuthenticated={setUser} />;
+  if (user.mustChangePassword) {
+    return (
+      <ForceChangePassword
+        user={user}
+        onChanged={setUser}
+        onLogout={() => { clearAuthToken(); setUser(null); }}
+      />
+    );
+  }
+
+  const ModuleRoute = ({ module, element }) => (
+    getPermission(user.role, module) === 'none' ? <Navigate to="/" replace /> : element
+  );
 
   return (
     <div className={styles.app}>
@@ -95,20 +124,20 @@ export default function App() {
       />
       <main className={styles.main}>
         <Routes>
-          <Route path="/" element={<DashboardView />} />
-          <Route path="/dispatch" element={<DispatchView />} />
-          <Route path="/handoff" element={<HandoffView />} />
-          <Route path="/calendar" element={<CalendarView />} />
-          <Route path="/imports" element={<ImportsView />} />
-          <Route path="/exports" element={<ExportsView />} />
-          <Route path="/drivers" element={<DriversView />} />
-          <Route path="/equipment" element={<EquipmentView />} />
-          <Route path="/airlines" element={<AirlinesView />} />
-          <Route path="/warehouses" element={<WarehousesView />} />
-          <Route path="/analytics" element={<AnalyticsView />} />
+          <Route path="/" element={<DashboardView user={user} />} />
+          <Route path="/dispatch" element={<ModuleRoute module="dispatch" element={<DispatchView user={user} />} />} />
+          <Route path="/handoff" element={<ModuleRoute module="handoff" element={<HandoffView user={user} />} />} />
+          <Route path="/calendar" element={<ModuleRoute module="calendar" element={<CalendarView user={user} />} />} />
+          <Route path="/imports" element={<ModuleRoute module="shipments" element={<ImportsView user={user} />} />} />
+          <Route path="/exports" element={<ModuleRoute module="shipments" element={<ExportsView user={user} />} />} />
+          <Route path="/drivers" element={<ModuleRoute module="drivers_hr" element={<DriversView user={user} />} />} />
+          <Route path="/equipment" element={<ModuleRoute module="equipment" element={<EquipmentView user={user} />} />} />
+          <Route path="/airlines" element={<ModuleRoute module="airlines" element={<AirlinesView user={user} />} />} />
+          <Route path="/warehouses" element={<ModuleRoute module="warehouses" element={<WarehousesView user={user} />} />} />
+          <Route path="/analytics" element={<ModuleRoute module="analytics" element={<AnalyticsView user={user} />} />} />
+          <Route path="/admin/users" element={getPermission(user.role, 'users') === 'none' ? <Navigate to="/" replace /> : <UsersView user={user} />} />
         </Routes>
       </main>
     </div>
   );
 }
-

@@ -6,10 +6,12 @@ const {
   generateTripNumber
 } = require('./dispatch.helpers');
 const { checkoutEquipment } = require('../../lib/equipmentHandoff');
+const requirePermission = require('../../middleware/requirePermission');
 const { checkEquipmentEligible } = require('./tripEligibility');
+const { checkRunEligibility } = require('../../lib/dispatchEligibility');
 
 // POST add a backup driver/truck to an existing run
-router.post('/:id/backups', async (req, res) => {
+router.post('/:id/backups', requirePermission('dispatch', 'full'), async (req, res) => {
   try {
     const parentId = req.params.id;
     const parentTrip = await prisma.trip.findUnique({ where: { id: parentId } });
@@ -71,6 +73,23 @@ router.post('/:id/backups', async (req, res) => {
       if (a.mode !== 'move' && a.mode !== 'split') {
         return res.status(400).json({ message: `Unknown allocation mode "${a.mode}"` });
       }
+    }
+
+    // ─── Driver/equipment/cargo compatibility ───
+    // Same engine as primary trip creation (lib/dispatchEligibility.js) —
+    // a backup driver is just as bound by license class, trailer eligibility,
+    // and hazmat/GDP certification as the primary driver would be.
+    const allocatedShipments = await prisma.shipment.findMany({
+      where: { id: { in: allocations.map(a => a.shipmentId) } }
+    });
+    const eligibility = checkRunEligibility({
+      driver,
+      truck: truckCheck.unit,
+      trailer: trailerCheck?.unit || null,
+      shipments: allocatedShipments,
+    });
+    if (!eligibility.ok) {
+      return res.status(409).json({ message: eligibility.errors.join(' — ') });
     }
 
     // ─── TRANSACTION WITH ATOMIC TRIP NUMBER GENERATION ───

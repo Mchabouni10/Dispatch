@@ -1,0 +1,370 @@
+/* AirlineDetailView.module.css
+   Detail presentation for a single airline. Mirrors WarehouseDetailView
+   structure and shared design tokens for app-wide consistency. */
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* ── Hero ────────────────────────────────────────────────────────────────── */
+.hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.heroLogo {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-md);
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  padding: 6px;
+  flex-shrink: 0;
+}
+
+.heroCode {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--accent), var(--accent-cyan));
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(79, 142, 247, 0.35);
+}
+
+.heroText {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+  margin: 0 0 8px;
+  line-height: 1.25;
+}
+
+.heroMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.codeChip {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: var(--accent-cyan);
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.25);
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.awbChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--purple);
+  background: var(--purple-bg);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.awbChip svg {
+  font-size: 10px;
+}
+
+/* ── Pills ───────────────────────────────────────────────────────────────── */
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.pill svg {
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+.pill24 {
+  background: linear-gradient(135deg, rgba(0, 208, 132, 0.14), rgba(0, 212, 255, 0.12));
+  color: var(--success);
+  border-color: rgba(0, 208, 132, 0.35);
+  font-weight: 700;
+}
+
+.pillOpen {
+  color: var(--success);
+  background: var(--success-bg);
+  border-color: rgba(0, 208, 132, 0.35);
+}
+
+.pillClosed {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-color: rgba(255, 71, 87, 0.35);
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.statusDotOpen {
+  background: var(--success);
+  box-shadow: 0 0 0 0 rgba(0, 208, 132, 0.55);
+  animation: pulseDot 1.8s ease-in-out infinite;
+}
+
+.statusDotClosed {
+  background: var(--danger);
+}
+
+@keyframes pulseDot {
+  0%   { box-shadow: 0 0 0 0 rgba(0, 208, 132, 0.55); }
+  70%  { box-shadow: 0 0 0 5px rgba(0, 208, 132, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 208, 132, 0); }
+}
+
+/* ── Sections ────────────────────────────────────────────────────────────── */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  margin: 0;
+}
+
+.sectionTitle svg {
+  font-size: 12px;
+}
+
+/* ── Info grid ───────────────────────────────────────────────────────────── */
+.infoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px 20px;
+}
+
+.infoItem {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.infoLabel {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.infoLabel svg {
+  font-size: 10px;
+  opacity: 0.85;
+}
+
+.infoValue {
+  font-size: 13.5px;
+  color: var(--text-primary);
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.emptyHint {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0;
+}
+
+/* ── Hours ───────────────────────────────────────────────────────────────── */
+.hoursBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hoursMain {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.dayStrip {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dayChip {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dayChipOn {
+  background: linear-gradient(135deg, var(--accent), var(--accent-cyan));
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(79, 142, 247, 0.3);
+}
+
+/* ── Facility / ops flags ────────────────────────────────────────────────── */
+.flagGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px 16px;
+}
+
+.flag {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.flag svg {
+  font-size: 14px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.flagYes { color: var(--success); }
+.flagNo { color: var(--text-muted); }
+.flagAccent { color: var(--accent); }
+
+/* ── Notes ───────────────────────────────────────────────────────────────── */
+.notes {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+/* ── Actions ─────────────────────────────────────────────────────────────── */
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.cancelBtn {
+  padding: 11px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.cancelBtn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.saveBtn {
+  padding: 10px 22px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: 0 4px 12px rgba(79, 142, 247, 0.3);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.saveBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(79, 142, 247, 0.4);
+}
+
+@media (max-width: 640px) {
+  .infoGrid,
+  .flagGrid {
+    grid-template-columns: 1fr;
+  }
+  .actions {
+    flex-wrap: wrap;
+  }
+  .cancelBtn,
+  .saveBtn {
+    flex: 1;
+    min-width: 120px;
+    justify-content: center;
+  }
+}

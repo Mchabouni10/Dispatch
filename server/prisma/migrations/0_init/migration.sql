@@ -1,4 +1,7 @@
 -- CreateEnum
+CREATE TYPE "Role" AS ENUM ('SUPER_ADMIN', 'DIRECTOR', 'HR_MANAGER', 'FLEET_MANAGER', 'DISPATCHER', 'VIEWER');
+
+-- CreateEnum
 CREATE TYPE "EquipmentHandoffAction" AS ENUM ('CHECKOUT', 'SWAP', 'RETURN', 'REPLACE');
 
 -- CreateEnum
@@ -297,6 +300,7 @@ CREATE TABLE "User" (
     "name" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "passwordHash" TEXT NOT NULL,
+    "role" "Role" NOT NULL DEFAULT 'DISPATCHER',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

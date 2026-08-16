@@ -17,6 +17,8 @@ model Shipment {
 
   // Import-specific fields
   ordNumber             String?  // ORD number for imports only
+  originCity            String?  // Origin city/airport of the shipment (was "station")
+  flightNumber          String?  // Arrival flight number, e.g. "AA91/08"
   lastFreeDay           DateTime?
   storageFeePerDay      Float    @default(0)
   storageFeeDaysOver    Int      @default(0)
@@ -25,6 +27,8 @@ model Shipment {
   terminalFeePaid       Boolean  @default(false)
   isGDP                 Boolean  @default(false) // Temperature controlled
   gdpTemperatureRange   String?  // e.g., "2-8°C", "15-25°C"
+  isHazmat              Boolean  @default(false) // Dangerous-goods permit — see lib/dispatchEligibility.js
+  hazmatClass           String?  // e.g. "Class 9", "UN3480"
 
   // Export-specific fields
   flightDate            DateTime?
@@ -75,3 +79,8 @@ model ShipmentGroupShipment {
 
   @@id([shipmentId, shipmentGroupId])
 }
+
+
+
+
+

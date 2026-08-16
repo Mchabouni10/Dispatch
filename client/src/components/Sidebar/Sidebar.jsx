@@ -16,28 +16,41 @@ import {
   faMoon,
   faSun,
   faXmark,
+  faArrowRightFromBracket,
 } from "@fortawesome/free-solid-svg-icons";
 import styles from "./Sidebar.module.css";
 import logo from "../../../images/app-logo.jpeg";
+import { getPermission } from "../../permissions.js";
 
 const navItems = [
-  { to: "/", label: "Dashboard", icon: faChartLine, exact: true },
-  { to: "/dispatch", label: "Dispatch Board", icon: faBolt },
-  { to: "/handoff", label: "Handoff Board", icon: faKey },
-  { to: "/calendar", label: "Calendar", icon: faCalendarDays },
-  { to: "/imports", label: "Imports", icon: faPlaneArrival },
-  { to: "/exports", label: "Exports", icon: faPlaneDeparture },
-  { to: "/drivers", label: "Drivers", icon: faIdCard },
-  { to: "/equipment", label: "Equipment", icon: faCar },
-  { to: "/airlines", label: "Airlines", icon: faPlane },
-  { to: "/warehouses", label: "Warehouses", icon: faWarehouse },
-  { to: "/analytics", label: "Analytics", icon: faChartPie },
+  { to: "/", label: "Dashboard", module: "dashboard", icon: faChartLine, exact: true },
+  { to: "/dispatch", label: "Dispatch Board", module: "dispatch", icon: faBolt },
+  { to: "/handoff", label: "Handoff Board", module: "handoff", icon: faKey },
+  { to: "/calendar", label: "Calendar", module: "calendar", icon: faCalendarDays },
+  { to: "/imports", label: "Imports", module: "shipments", icon: faPlaneArrival },
+  { to: "/exports", label: "Exports", module: "shipments", icon: faPlaneDeparture },
+  { to: "/drivers", label: "Drivers", module: "drivers_hr", icon: faIdCard },
+  { to: "/equipment", label: "Equipment", module: "equipment", icon: faCar },
+  { to: "/airlines", label: "Airlines", module: "airlines", icon: faPlane },
+  { to: "/warehouses", label: "Warehouses", module: "warehouses", icon: faWarehouse },
+  { to: "/analytics", label: "Analytics", module: "analytics", icon: faChartPie },
+  { to: "/admin/users", label: "User Management", module: "users", icon: faIdCard },
 ];
+
+// Turn "Jane Doe" into "JD", fall back gracefully for single names.
+function getInitials(name = "") {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 export default function Sidebar({ user, theme, onToggleTheme, onLogout, isOpen = false, onClose }) {
   const handleNavClick = () => {
     if (onClose) onClose();
   };
+
+  const isDark = theme !== "light";
 
   return (
     <>
@@ -74,7 +87,7 @@ export default function Sidebar({ user, theme, onToggleTheme, onLogout, isOpen =
         </div>
 
         <nav className={styles.nav}>
-          {navItems.map((item) => (
+          {navItems.filter((item) => getPermission(user?.role, item.module) !== 'none').map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -95,26 +108,50 @@ export default function Sidebar({ user, theme, onToggleTheme, onLogout, isOpen =
 
         <button
           type="button"
+          role="switch"
+          aria-checked={isDark}
           className={styles.themeToggle}
           onClick={onToggleTheme}
           aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
         >
-          <span className={styles.themeIcon}>
-            <FontAwesomeIcon icon={theme === "light" ? faMoon : faSun} />
+          <span className={styles.themeToggleLabel}>
+            {theme === "light" ? "Light mode" : "Dark mode"}
           </span>
-          <span>{theme === "light" ? "Dark mode" : "Light mode"}</span>
+          <span className={`${styles.themeSwitch} ${isDark ? styles.themeSwitchDark : ""}`}>
+            <FontAwesomeIcon icon={faSun} className={styles.themeSwitchIconSun} />
+            <FontAwesomeIcon icon={faMoon} className={styles.themeSwitchIconMoon} />
+            <span className={styles.themeSwitchThumb}>
+              <FontAwesomeIcon icon={isDark ? faMoon : faSun} />
+            </span>
+          </span>
         </button>
 
         <div className={styles.footer}>
           <div className={styles.account}>
-            <div className={styles.accountName}>{user.name}</div>
-            <div className={styles.accountEmail}>{user.email}</div>
-            <button type="button" onClick={onLogout}>Log out</button>
+            <div className={styles.accountAvatar} aria-hidden="true">
+              {getInitials(user?.name)}
+            </div>
+            <div className={styles.accountInfo}>
+              <div className={styles.accountName}>{user?.name}</div>
+              <div className={styles.accountEmail}>{user?.email}</div>
+              <div className={styles.accountEmail}>{user?.role?.replaceAll('_', ' ')}</div>
+            </div>
+            <button
+              type="button"
+              onClick={onLogout}
+              className={styles.logoutBtn}
+              aria-label="Log out"
+              title="Log out"
+            >
+              <FontAwesomeIcon icon={faArrowRightFromBracket} />
+            </button>
           </div>
-          <div className={styles.version}>v1.0.0 · Dispatch Pro</div>
+          <div className={styles.version}>
+            <span className={styles.versionDot} />
+            Dispatch Pro <span className={styles.versionNumber}>v1.0.0</span>
+          </div>
         </div>
       </aside>
     </>
   );
 }
-

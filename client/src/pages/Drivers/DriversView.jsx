@@ -36,6 +36,7 @@ import {
   faTable,
   faThLarge,
   faChevronDown,
+  faEye,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   getDrivers,
@@ -45,10 +46,15 @@ import {
   updateDriverStatus,
   uploadDriverPhoto,
   uploadDriverLicensePhoto,
+  uploadDriverMedicalPhoto,
+  uploadDriverAirportBadgePhoto,
+  uploadDriverPassportPhoto,
   resolveUploadUrl,
 } from "../../api/api.js";
 import Modal from "../../components/Modal/Modal.jsx";
 import DateTimePicker from "../../styles/Datetimepicker.jsx";
+import { canWrite, canOperate } from "../../permissions.js";
+import DriverDetailView from "./DriverDetailView.jsx";
 import styles from "./DriversView.module.css";
 import tableStyles from "./DriversView.table.module.css";
 
@@ -122,6 +128,19 @@ const STATUS_OPTIONS = [
 
 // Statuses that require a leave date range
 const LEAVE_STATUSES = ["Vacation", "Sick Leave", "Absent", "Training"];
+
+// One-click statuses for the handoff-board-style quick menu (e.g. Dispatcher
+// sending a driver home or starting a break). Leave-type statuses are
+// excluded here since they require a date range collected via the full edit
+// form — picking one from a single dropdown with no dates would leave
+// leaveStart/leaveEnd empty.
+const QUICK_STATUS_OPTIONS = [
+  "Available",
+  "On Trip",
+  "Break",
+  "On Call",
+  "Off Duty",
+];
 
 const VEHICLE_TYPES = ["Tractor", "Straight Truck", "Cube Truck", "Any"];
 const RUN_TYPES = ["Import", "Export", "Local", "Long Haul"];
@@ -201,7 +220,7 @@ const STATUS_ICONS = {
   "Sick Leave": faBan,
   Training: faGraduationCap,
   "On Call": faBell,
-  "Off Duty": faTimes,
+  "Off Duty": faUserClock,
   Terminated: faTimes,
 };
 
@@ -248,7 +267,16 @@ function getInitials(name) {
     .slice(0, 2);
 }
 
-export default function DriversView() {
+export default function DriversView({ user }) {
+  // Full access (SUPER_ADMIN/DIRECTOR/HR_MANAGER): everything below.
+  // Operational access (DISPATCHER): can see drivers and change status
+  // (handoff board actions — send home, break, check in) but cannot
+  // create/edit/delete a driver or touch pay/license/personal fields.
+  // Those fields are already stripped server-side for this role; canEditDrivers
+  // additionally hides the edit/delete affordances so there's nothing to click.
+  const canEditDrivers = canWrite(user?.role, "drivers_hr");
+  const canManageStatus = canOperate(user?.role, "drivers_hr");
+
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -266,6 +294,13 @@ export default function DriversView() {
   const [photoPreview, setPhotoPreview] = useState("");
   const [licensePhotoFile, setLicensePhotoFile] = useState(null);
   const [licensePhotoPreview, setLicensePhotoPreview] = useState("");
+  const [medicalPhotoFile, setMedicalPhotoFile] = useState(null);
+  const [medicalPhotoPreview, setMedicalPhotoPreview] = useState("");
+  const [badgePhotoFile, setBadgePhotoFile] = useState(null);
+  const [badgePhotoPreview, setBadgePhotoPreview] = useState("");
+  const [passportPhotoFile, setPassportPhotoFile] = useState(null);
+  const [passportPhotoPreview, setPassportPhotoPreview] = useState("");
+  const [viewing, setViewing] = useState(null);
 
   const VIEW_KEY = "driversViewMode";
   const [viewMode, setViewMode] = useState(() => {
@@ -306,6 +341,12 @@ export default function DriversView() {
     setPhotoPreview("");
     setLicensePhotoFile(null);
     setLicensePhotoPreview("");
+    setMedicalPhotoFile(null);
+    setMedicalPhotoPreview("");
+    setBadgePhotoFile(null);
+    setBadgePhotoPreview("");
+    setPassportPhotoFile(null);
+    setPassportPhotoPreview("");
     setError("");
     setModalOpen(true);
   };
@@ -345,6 +386,18 @@ export default function DriversView() {
     setLicensePhotoPreview(
       d.licensePhoto ? resolveUploadUrl(d.licensePhoto) : "",
     );
+    setMedicalPhotoFile(null);
+    setMedicalPhotoPreview(
+      d.medicalCertPhoto ? resolveUploadUrl(d.medicalCertPhoto) : "",
+    );
+    setBadgePhotoFile(null);
+    setBadgePhotoPreview(
+      d.airportBadgePhoto ? resolveUploadUrl(d.airportBadgePhoto) : "",
+    );
+    setPassportPhotoFile(null);
+    setPassportPhotoPreview(
+      d.passportPhoto ? resolveUploadUrl(d.passportPhoto) : "",
+    );
     setError("");
     setModalOpen(true);
   };
@@ -357,6 +410,12 @@ export default function DriversView() {
     setPhotoPreview("");
     setLicensePhotoFile(null);
     setLicensePhotoPreview("");
+    setMedicalPhotoFile(null);
+    setMedicalPhotoPreview("");
+    setBadgePhotoFile(null);
+    setBadgePhotoPreview("");
+    setPassportPhotoFile(null);
+    setPassportPhotoPreview("");
   };
 
   const handlePhotoChange = (e) => {
@@ -371,6 +430,27 @@ export default function DriversView() {
     if (!file) return;
     setLicensePhotoFile(file);
     setLicensePhotoPreview(URL.createObjectURL(file));
+  };
+
+  const handleMedicalPhotoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setMedicalPhotoFile(file);
+    setMedicalPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const handleBadgePhotoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBadgePhotoFile(file);
+    setBadgePhotoPreview(URL.createObjectURL(file));
+  };
+
+  const handlePassportPhotoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPassportPhotoFile(file);
+    setPassportPhotoPreview(URL.createObjectURL(file));
   };
 
   const isLeaveStatus = LEAVE_STATUSES.includes(form.status);
@@ -473,6 +553,15 @@ export default function DriversView() {
       }
       if (licensePhotoFile && saved?.id) {
         await uploadDriverLicensePhoto(saved.id, licensePhotoFile);
+      }
+      if (medicalPhotoFile && saved?.id) {
+        await uploadDriverMedicalPhoto(saved.id, medicalPhotoFile);
+      }
+      if (badgePhotoFile && saved?.id) {
+        await uploadDriverAirportBadgePhoto(saved.id, badgePhotoFile);
+      }
+      if (passportPhotoFile && saved?.id) {
+        await uploadDriverPassportPhoto(saved.id, passportPhotoFile);
       }
       await load();
       closeModal();
@@ -643,7 +732,7 @@ export default function DriversView() {
   const expiredAlertsCount = complianceAlerts.filter((a) => a.expired).length;
   const expiringAlertsCount = complianceAlerts.length - expiredAlertsCount;
 
-  const [alertsExpanded, setAlertsExpanded] = useState(true);
+  const [alertsExpanded, setAlertsExpanded] = useState(false);
   const [alertsDismissed, setAlertsDismissed] = useState(false);
 
   // Bring the banner back if the set of alerts changes after a dismissal
@@ -688,10 +777,12 @@ export default function DriversView() {
               <FontAwesomeIcon icon={faTable} /><span className={tableStyles.toggleLabel}>Table</span>
             </button>
           </div>
-          <button className={styles.addBtn} onClick={openAdd} id="add-driver-btn">
-            <FontAwesomeIcon icon={faPlus} />
-            Add Driver
-          </button>
+          {canEditDrivers && (
+            <button className={styles.addBtn} onClick={openAdd} id="add-driver-btn">
+              <FontAwesomeIcon icon={faPlus} />
+              Add Driver
+            </button>
+          )}
         </div>
       </div>
 
@@ -910,7 +1001,7 @@ export default function DriversView() {
                         <td>
                           <div className={tableStyles.driverCell}>
                             {driver.photo ? (
-                              <img src={driver.photo} alt="" className={tableStyles.avatarImg} />
+                              <img src={resolveUploadUrl(driver.photo)} alt="" className={tableStyles.avatarImg} />
                             ) : (
                               <div className={tableStyles.avatar}>{initials}</div>
                             )}
@@ -966,12 +1057,44 @@ export default function DriversView() {
                         </td>
                         <td onClick={(e) => e.stopPropagation()}>
                           <div className={tableStyles.actions}>
-                            <button className={`${tableStyles.actionBtn} ${tableStyles.editBtn}`} onClick={() => openEdit(driver)} title="Edit">
-                              <FontAwesomeIcon icon={faPencil} />
+                            <button
+                              type="button"
+                              className={`${tableStyles.actionBtn} ${tableStyles.viewBtn}`}
+                              onClick={(e) => { e.stopPropagation(); setViewing(driver); }}
+                              title="View"
+                            >
+                              <FontAwesomeIcon icon={faEye} />
                             </button>
-                            <button className={`${tableStyles.actionBtn} ${tableStyles.deleteBtn}`} onClick={() => setDeleteId(driver.id)} title="Delete">
-                              <FontAwesomeIcon icon={faTrash} />
-                            </button>
+                            {canManageStatus && (
+                              <select
+                                className={tableStyles.statusSelect}
+                                value={driver.status}
+                                onChange={(e) =>
+                                  handleStatusChange(driver.id, e.target.value)
+                                }
+                                title="Change status"
+                                aria-label={`Change status for ${driver.name}`}
+                              >
+                                {(QUICK_STATUS_OPTIONS.includes(driver.status)
+                                  ? QUICK_STATUS_OPTIONS
+                                  : [driver.status, ...QUICK_STATUS_OPTIONS]
+                                ).map((s) => (
+                                  <option key={s} value={s}>
+                                    {s}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                            {canEditDrivers && (
+                              <>
+                                <button className={`${tableStyles.actionBtn} ${tableStyles.editBtn}`} onClick={() => openEdit(driver)} title="Edit">
+                                  <FontAwesomeIcon icon={faPencil} />
+                                </button>
+                                <button className={`${tableStyles.actionBtn} ${tableStyles.deleteBtn}`} onClick={() => setDeleteId(driver.id)} title="Delete">
+                                  <FontAwesomeIcon icon={faTrash} />
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1083,7 +1206,9 @@ export default function DriversView() {
                         )}
                       </div>
                       <div className={styles.driverSubline}>
-                        <StatusBadgeWithIcon status={driver.status} />
+                        {!canManageStatus && (
+                          <StatusBadgeWithIcon status={driver.status} />
+                        )}
                         <span className={styles.driverNumber}>
                           #{driver.employeeId}
                         </span>
@@ -1091,19 +1216,52 @@ export default function DriversView() {
                     </div>
                     <div className={styles.cardActions}>
                       <button
-                        className={styles.editBtn}
-                        onClick={() => openEdit(driver)}
-                        title="Edit"
+                        type="button"
+                        className={styles.viewBtn}
+                        onClick={() => setViewing(driver)}
+                        title="View"
                       >
-                        <FontAwesomeIcon icon={faPencil} />
+                        <FontAwesomeIcon icon={faEye} />
                       </button>
-                      <button
-                        className={styles.deleteBtn}
-                        onClick={() => setDeleteId(driver.id)}
-                        title="Delete"
-                      >
-                        <FontAwesomeIcon icon={faTrash} />
-                      </button>
+                      {canManageStatus && (
+                        <select
+                          className={`${styles.statusSelect} ${styles[`statusSelect_${driver.status?.replace(" ", "_")}`] || ""}`}
+                          value={driver.status}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) =>
+                            handleStatusChange(driver.id, e.target.value)
+                          }
+                          title="Change status"
+                          aria-label={`Change status for ${driver.name}`}
+                        >
+                          {(QUICK_STATUS_OPTIONS.includes(driver.status)
+                            ? QUICK_STATUS_OPTIONS
+                            : [driver.status, ...QUICK_STATUS_OPTIONS]
+                          ).map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {canEditDrivers && (
+                        <>
+                          <button
+                            className={styles.editBtn}
+                            onClick={() => openEdit(driver)}
+                            title="Edit"
+                          >
+                            <FontAwesomeIcon icon={faPencil} />
+                          </button>
+                          <button
+                            className={styles.deleteBtn}
+                            onClick={() => setDeleteId(driver.id)}
+                            title="Delete"
+                          >
+                            <FontAwesomeIcon icon={faTrash} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -1112,7 +1270,11 @@ export default function DriversView() {
                       <FontAwesomeIcon icon={faIdCard} />
                       <span>
                         Class {driver.licenseClass} ·{" "}
-                        {driver.licenseNumber || "No license"}
+                        {driver.licenseNumber
+                          ? driver.licenseNumber
+                          : canEditDrivers
+                            ? "No license"
+                            : "Hidden"}
                       </span>
                       {driver.licensePhoto && (
                         <a
@@ -1724,6 +1886,72 @@ export default function DriversView() {
             </div>
 
             <div className={`${styles.formGroup} ${styles.fullWidth}`}>
+              <label className={styles.label}>DOT Medical Card Scan (optional)</label>
+              <div className={styles.licenseUploadRow}>
+                <div className={styles.licensePreviewWrap}>
+                  {medicalPhotoPreview ? (
+                    <img className={styles.licensePreview} src={medicalPhotoPreview} alt="Medical card preview" />
+                  ) : (
+                    <div className={styles.licensePlaceholder}>
+                      <FontAwesomeIcon icon={faFileImage} />
+                      <span>No scan</span>
+                    </div>
+                  )}
+                </div>
+                <label className={styles.photoUploadBtn}>
+                  <FontAwesomeIcon icon={faCamera} />
+                  {medicalPhotoPreview ? "Change Scan" : "Upload Medical Scan"}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleMedicalPhotoChange} hidden />
+                </label>
+              </div>
+              <small>Optional · JPEG, PNG or WEBP · max 5 MB</small>
+            </div>
+
+            <div className={`${styles.formGroup} ${styles.fullWidth}`}>
+              <label className={styles.label}>Airport / SIDA Badge (optional)</label>
+              <div className={styles.licenseUploadRow}>
+                <div className={styles.licensePreviewWrap}>
+                  {badgePhotoPreview ? (
+                    <img className={styles.licensePreview} src={badgePhotoPreview} alt="Airport badge preview" />
+                  ) : (
+                    <div className={styles.licensePlaceholder}>
+                      <FontAwesomeIcon icon={faFileImage} />
+                      <span>No scan</span>
+                    </div>
+                  )}
+                </div>
+                <label className={styles.photoUploadBtn}>
+                  <FontAwesomeIcon icon={faCamera} />
+                  {badgePhotoPreview ? "Change Scan" : "Upload Badge Scan"}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleBadgePhotoChange} hidden />
+                </label>
+              </div>
+              <small>Optional · JPEG, PNG or WEBP · max 5 MB</small>
+            </div>
+
+            <div className={`${styles.formGroup} ${styles.fullWidth}`}>
+              <label className={styles.label}>Passport (optional)</label>
+              <div className={styles.licenseUploadRow}>
+                <div className={styles.licensePreviewWrap}>
+                  {passportPhotoPreview ? (
+                    <img className={styles.licensePreview} src={passportPhotoPreview} alt="Passport preview" />
+                  ) : (
+                    <div className={styles.licensePlaceholder}>
+                      <FontAwesomeIcon icon={faFileImage} />
+                      <span>No scan</span>
+                    </div>
+                  )}
+                </div>
+                <label className={styles.photoUploadBtn}>
+                  <FontAwesomeIcon icon={faCamera} />
+                  {passportPhotoPreview ? "Change Scan" : "Upload Passport Scan"}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePassportPhotoChange} hidden />
+                </label>
+              </div>
+              <small>Optional · for cross-border runs · JPEG, PNG or WEBP · max 5 MB</small>
+            </div>
+
+            <div className={`${styles.formGroup} ${styles.fullWidth}`}>
               <label className={styles.label}>Vehicle Types</label>
               <select
                 id="driver-vehicle-types"
@@ -2186,6 +2414,23 @@ export default function DriversView() {
       </Modal>
 
       <Modal
+        isOpen={!!viewing}
+        onClose={() => setViewing(null)}
+        title={viewing?.name || "Driver"}
+        size="lg"
+      >
+        <DriverDetailView
+          driver={viewing}
+          onClose={() => setViewing(null)}
+          onEdit={(d) => {
+            setViewing(null);
+            if (canEditDrivers) openEdit(d);
+          }}
+          showSensitive={canEditDrivers}
+        />
+      </Modal>
+
+      <Modal
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
         title="Delete Driver"
@@ -2214,6 +2459,9 @@ export default function DriversView() {
     </div>
   );
 }
+
+
+
 
 
 

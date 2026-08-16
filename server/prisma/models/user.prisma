@@ -1,8 +1,19 @@
+// ============================================================
+// MODEL: User
+// ============================================================
 model User {
   id           String   @id @default(cuid())
   name         String
   email        String   @unique
   passwordHash String
+  role         Role     @default(DISPATCHER)
+  // True for admin-created accounts until the person sets their own password.
+  // Enforced by requireAuth: while true, every protected route except
+  // PATCH /auth/password is blocked.
+  mustChangePassword Boolean @default(false)
+  // Email of the admin who created this account, for a lightweight audit
+  // trail. Null for the original bootstrap SUPER_ADMIN (self-registered).
+  createdBy    String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

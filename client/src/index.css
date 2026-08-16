@@ -135,6 +135,16 @@ button {
   outline: none;
 }
 
+button:focus-visible, a:focus-visible, input:focus-visible,
+textarea:focus-visible, select:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+}
+
+h1, h2, h3, h4, p { margin: 0; }
+table { border-spacing: 0; }
+button, input, textarea, select { font-size: inherit; }
+
 input, textarea, select {
   font-family: inherit;
 }

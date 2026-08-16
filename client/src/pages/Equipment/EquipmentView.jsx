@@ -32,6 +32,9 @@ import {
   faCube,
   faCircleCheck,
   faBan,
+  faEye,
+  faCamera,
+  faFileImage,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   getEquipment,
@@ -40,9 +43,14 @@ import {
   deleteEquipment,
   getDrivers,
   assignEquipment,
+  uploadEquipmentPhoto,
+  updateEquipmentStatus,
+  resolveUploadUrl,
 } from "../../api/api.js";
+import { canWrite, canOperate } from "../../permissions.js";
 import Modal from "../../components/Modal/Modal.jsx";
 import DateTimePicker, { toLocalISO } from "../../styles/Datetimepicker.jsx";
+import EquipmentDetailView from "./EquipmentDetailView.jsx";
 import styles from "./EquipmentView.module.css";
 import tableStyles from "./EquipmentView.table.module.css";
 
@@ -156,7 +164,16 @@ function getAvailabilityKey(item, now) {
   return "out_of_service";
 }
 
-export default function EquipmentView() {
+export default function EquipmentView({ user }) {
+  // Full access (SUPER_ADMIN/DIRECTOR/FLEET_MANAGER): create, edit specs,
+  // delete, manage photos. Operational access (DISPATCHER): can see units and
+  // run the Handoff Board (assign/release, force-release, out-of-service
+  // toggle) but cannot create/edit/delete a unit or touch its photos. Those
+  // routes are enforced server-side too — this just keeps the affordances
+  // that would 403 off the screen.
+  const canEditEquipment = canWrite(user?.role, "equipment");
+  const canOperateEquipment = canOperate(user?.role, "equipment");
+
   const [equipment, setEquipment] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -172,6 +189,10 @@ export default function EquipmentView() {
   const [saving, setSaving] = useState(false);
   const [tick, setTick] = useState(0);
   const [releasingId, setReleasingId] = useState(null);
+  const [statusUpdatingId, setStatusUpdatingId] = useState(null);
+  const [viewing, setViewing] = useState(null);
+  const [photoFiles, setPhotoFiles] = useState([]); // File[] pending upload on save
+  const [photoPreviews, setPhotoPreviews] = useState([]); // object URLs + existing
   const [viewMode, setViewMode] = useState(() => {
     try {
       return localStorage.getItem(VIEW_KEY) || "cards";
@@ -226,6 +247,8 @@ export default function EquipmentView() {
   const openAdd = () => {
     setEditing(null);
     setForm(INITIAL_FORM);
+    setPhotoFiles([]);
+    setPhotoPreviews([]);
     setError("");
     setModalOpen(true);
   };
@@ -244,6 +267,14 @@ export default function EquipmentView() {
       leaseEndDate: toDateInput(item.leaseEndDate),
       monthlyPaymentAmount: item.monthlyPaymentAmount ?? "",
     });
+    setPhotoFiles([]);
+    setPhotoPreviews(
+      (item.images || []).map((path) => ({
+        src: resolveUploadUrl(path),
+        path,
+        existing: true,
+      })),
+    );
     setError("");
     setModalOpen(true);
   };
@@ -251,6 +282,45 @@ export default function EquipmentView() {
     setModalOpen(false);
     setEditing(null);
     setError("");
+    setPhotoFiles([]);
+    setPhotoPreviews([]);
+  };
+
+  const handlePhotoPick = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setPhotoFiles((prev) => [...prev, ...files]);
+    setPhotoPreviews((prev) => [
+      ...prev,
+      ...files.map((f) => ({
+        src: URL.createObjectURL(f),
+        path: null,
+        existing: false,
+        file: f,
+      })),
+    ]);
+    e.target.value = "";
+  };
+
+  const removePreview = (index) => {
+    setPhotoPreviews((prev) => {
+      const next = [...prev];
+      const removed = next.splice(index, 1)[0];
+      if (removed && !removed.existing && removed.src?.startsWith("blob:")) {
+        try { URL.revokeObjectURL(removed.src); } catch {}
+      }
+      return next;
+    });
+    // Drop matching pending File if it was a new pick (order: existing first, then new)
+    setPhotoFiles((prev) => {
+      const preview = photoPreviews[index];
+      if (!preview || preview.existing) return prev;
+      const idx = prev.findIndex((f) => f === preview.file);
+      if (idx < 0) return prev;
+      const copy = [...prev];
+      copy.splice(idx, 1);
+      return copy;
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -329,8 +399,16 @@ export default function EquipmentView() {
         payload.leaseEndDate = null;
         payload.monthlyPaymentAmount = null;
       }
-      if (editing) await updateEquipment(editing.id, payload);
-      else await createEquipment(payload);
+      let saved;
+      if (editing) saved = await updateEquipment(editing.id, payload);
+      else saved = await createEquipment(payload);
+
+      const unitId = saved?.id || editing?.id;
+      if (unitId && photoFiles.length) {
+        for (const file of photoFiles) {
+          await uploadEquipmentPhoto(unitId, file);
+        }
+      }
       await load();
       closeModal();
     } catch (err) {
@@ -381,6 +459,44 @@ export default function EquipmentView() {
       setError(err.message || "Failed to release equipment");
     } finally {
       setReleasingId(null);
+    }
+  };
+
+  // Quick in-service / out-of-service toggle — the one status-style write
+  // Dispatcher is granted on Equipment (server: PATCH /equipment/:id/status,
+  // 'operational'-gated, same tier as the "Release now" action above).
+  // Dispatcher is usually the first person to hear from a driver that a
+  // unit is broken down, so this needs to be reachable without asking a
+  // Fleet Manager to open the full edit form. Mirrors handleForceRelease:
+  // same confirm-before-acting pattern, same disabled-while-in-flight state.
+  const handleToggleServiceStatus = async (item) => {
+    const takingOutOfService = item.status !== "Out of Service";
+    let outOfServiceReason = null;
+
+    if (takingOutOfService) {
+      outOfServiceReason = window.prompt(
+        `Mark ${item.unitNumber} Out of Service — reason (optional):`,
+        "",
+      );
+      if (outOfServiceReason === null) return; // cancelled the prompt
+    } else if (
+      !window.confirm(`Return ${item.unitNumber} to service?`)
+    ) {
+      return;
+    }
+
+    setStatusUpdatingId(item.id);
+    setError("");
+    try {
+      await updateEquipmentStatus(item.id, {
+        status: takingOutOfService ? "Out of Service" : "In Service",
+        outOfServiceReason: outOfServiceReason || null,
+      });
+      await load();
+    } catch (err) {
+      setError(err.message || "Failed to update status");
+    } finally {
+      setStatusUpdatingId(null);
     }
   };
 
@@ -647,19 +763,31 @@ export default function EquipmentView() {
                 </div>
                 <div className={styles.cardActions}>
                   <button
-                    className={styles.editBtn}
-                    onClick={() => openEdit(item)}
-                    title="Edit"
+                    type="button"
+                    className={styles.viewBtn}
+                    onClick={() => setViewing(item)}
+                    title="View"
                   >
-                    <FontAwesomeIcon icon={faPencil} />
+                    <FontAwesomeIcon icon={faEye} />
                   </button>
-                  <button
-                    className={styles.deleteBtn}
-                    onClick={() => setDeleteId(item.id)}
-                    title="Delete"
-                  >
-                    <FontAwesomeIcon icon={faTrash} />
-                  </button>
+                  {canEditEquipment && (
+                    <button
+                      className={styles.editBtn}
+                      onClick={() => openEdit(item)}
+                      title="Edit"
+                    >
+                      <FontAwesomeIcon icon={faPencil} />
+                    </button>
+                  )}
+                  {canEditEquipment && (
+                    <button
+                      className={styles.deleteBtn}
+                      onClick={() => setDeleteId(item.id)}
+                      title="Delete"
+                    >
+                      <FontAwesomeIcon icon={faTrash} />
+                    </button>
+                  )}
                 </div>
               </div>
               <div className={styles.cardBody}>
@@ -673,6 +801,36 @@ export default function EquipmentView() {
                   >
                     {item.status}
                   </span>
+                  {canOperateEquipment && (
+                    <button
+                      type="button"
+                      className={
+                        item.status === "Out of Service"
+                          ? styles.returnServiceBtn
+                          : styles.oosToggleBtn
+                      }
+                      onClick={() => handleToggleServiceStatus(item)}
+                      disabled={statusUpdatingId === item.id}
+                      title={
+                        item.status === "Out of Service"
+                          ? "Return to service"
+                          : "Mark out of service"
+                      }
+                    >
+                      <FontAwesomeIcon
+                        icon={
+                          item.status === "Out of Service"
+                            ? faCircleCheck
+                            : faBan
+                        }
+                      />
+                      {statusUpdatingId === item.id
+                        ? "Updating…"
+                        : item.status === "Out of Service"
+                          ? "Return to service"
+                          : "Mark OOS"}
+                    </button>
+                  )}
                   {item.year && (
                     <span className={styles.metaTag}>
                       <FontAwesomeIcon icon={faCalendarDays} /> {item.year}
@@ -737,15 +895,17 @@ export default function EquipmentView() {
                   <div className={styles.oosReason}>
                     <FontAwesomeIcon icon={faTriangleExclamation} />
                     <span>{stuckMessage}</span>
-                    <button
-                      type="button"
-                      className={styles.releaseBtn}
-                      onClick={() => handleForceRelease(item)}
-                      disabled={releasingId === item.id}
-                    >
-                      <FontAwesomeIcon icon={faLinkSlash} />
-                      {releasingId === item.id ? "Releasing…" : "Release now"}
-                    </button>
+                    {canOperateEquipment && (
+                      <button
+                        type="button"
+                        className={styles.releaseBtn}
+                        onClick={() => handleForceRelease(item)}
+                        disabled={releasingId === item.id}
+                      >
+                        <FontAwesomeIcon icon={faLinkSlash} />
+                        {releasingId === item.id ? "Releasing…" : "Release now"}
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -943,16 +1103,43 @@ export default function EquipmentView() {
                           </div>
                         </div>
                       </td>
-                      <td>
-                        <span
-                          className={`${tableStyles.statusPill} ${
-                            item.status === "In Service"
-                              ? tableStyles.statusIn
-                              : tableStyles.statusOut
-                          }`}
-                        >
-                          {item.status}
-                        </span>
+                      <td onClick={(e) => canOperateEquipment && e.stopPropagation()}>
+                        <div className={styles.stuckCell}>
+                          <span
+                            className={`${tableStyles.statusPill} ${
+                              item.status === "In Service"
+                                ? tableStyles.statusIn
+                                : tableStyles.statusOut
+                            }`}
+                          >
+                            {item.status}
+                          </span>
+                          {canOperateEquipment && (
+                            <button
+                              type="button"
+                              className={
+                                item.status === "Out of Service"
+                                  ? styles.returnServiceBtnSm
+                                  : styles.oosToggleBtnSm
+                              }
+                              onClick={() => handleToggleServiceStatus(item)}
+                              disabled={statusUpdatingId === item.id}
+                              title={
+                                item.status === "Out of Service"
+                                  ? "Return to service"
+                                  : "Mark out of service"
+                              }
+                            >
+                              <FontAwesomeIcon
+                                icon={
+                                  item.status === "Out of Service"
+                                    ? faCircleCheck
+                                    : faBan
+                                }
+                              />
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td
                         className={tableStyles.availCell}
@@ -963,17 +1150,19 @@ export default function EquipmentView() {
                             <span className={tableStyles.danger}>
                               {stuckMessage.split(" — ")[0]}
                             </span>
-                            <button
-                              type="button"
-                              className={styles.releaseBtnSm}
-                              onClick={() => handleForceRelease(item)}
-                              disabled={releasingId === item.id}
-                            >
-                              <FontAwesomeIcon icon={faLinkSlash} />
-                              {releasingId === item.id
-                                ? "Releasing…"
-                                : "Release"}
-                            </button>
+                            {canOperateEquipment && (
+                              <button
+                                type="button"
+                                className={styles.releaseBtnSm}
+                                onClick={() => handleForceRelease(item)}
+                                disabled={releasingId === item.id}
+                              >
+                                <FontAwesomeIcon icon={faLinkSlash} />
+                                {releasingId === item.id
+                                  ? "Releasing…"
+                                  : "Release"}
+                              </button>
+                            )}
                           </div>
                         ) : isHandedOff ? (
                           <span>
@@ -1076,19 +1265,34 @@ export default function EquipmentView() {
                       <td onClick={(e) => e.stopPropagation()}>
                         <div className={tableStyles.actions}>
                           <button
-                            className={`${tableStyles.actionBtn} ${tableStyles.editBtn}`}
-                            onClick={() => openEdit(item)}
-                            title="Edit"
+                            type="button"
+                            className={`${tableStyles.actionBtn} ${tableStyles.viewBtn}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setViewing(item);
+                            }}
+                            title="View"
                           >
-                            <FontAwesomeIcon icon={faPencil} />
+                            <FontAwesomeIcon icon={faEye} />
                           </button>
-                          <button
-                            className={`${tableStyles.actionBtn} ${tableStyles.deleteBtn}`}
-                            onClick={() => setDeleteId(item.id)}
-                            title="Delete"
-                          >
-                            <FontAwesomeIcon icon={faTrash} />
-                          </button>
+                          {canEditEquipment && (
+                            <button
+                              className={`${tableStyles.actionBtn} ${tableStyles.editBtn}`}
+                              onClick={() => openEdit(item)}
+                              title="Edit"
+                            >
+                              <FontAwesomeIcon icon={faPencil} />
+                            </button>
+                          )}
+                          {canEditEquipment && (
+                            <button
+                              className={`${tableStyles.actionBtn} ${tableStyles.deleteBtn}`}
+                              onClick={() => setDeleteId(item.id)}
+                              title="Delete"
+                            >
+                              <FontAwesomeIcon icon={faTrash} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1286,13 +1490,15 @@ export default function EquipmentView() {
               <span className={tableStyles.toggleLabel}>Table</span>
             </button>
           </div>
-          <button
-            className={styles.addBtn}
-            onClick={openAdd}
-            id="add-equipment-btn"
-          >
-            <FontAwesomeIcon icon={faPlus} /> Add Equipment
-          </button>
+          {canEditEquipment && (
+            <button
+              className={styles.addBtn}
+              onClick={openAdd}
+              id="add-equipment-btn"
+            >
+              <FontAwesomeIcon icon={faPlus} /> Add Equipment
+            </button>
+          )}
         </div>
       </div>
 
@@ -1808,6 +2014,40 @@ export default function EquipmentView() {
                 </div>
               </>
             )}
+            <div className={`${styles.formGroup} ${styles.fullWidth} ${styles.sectionTitle}`}>
+              <FontAwesomeIcon icon={faCamera} /> Unit photos
+            </div>
+            <div className={`${styles.formGroup} ${styles.fullWidth}`}>
+              <label className={styles.label}>Photos (optional)</label>
+              <div className={styles.photoGrid}>
+                {photoPreviews.map((p, i) => (
+                  <div key={`${p.src}-${i}`} className={styles.photoThumb}>
+                    <img src={p.src} alt={`Unit photo ${i + 1}`} />
+                    <button
+                      type="button"
+                      className={styles.photoRemove}
+                      onClick={() => removePreview(i)}
+                      title="Remove"
+                    >
+                      <FontAwesomeIcon icon={faXmark} />
+                    </button>
+                  </div>
+                ))}
+                <label className={styles.photoAdd}>
+                  <FontAwesomeIcon icon={faFileImage} />
+                  <span>Add photo</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    onChange={handlePhotoPick}
+                    hidden
+                  />
+                </label>
+              </div>
+              <small>JPEG, PNG or WEBP · max 5 MB each · exterior, plate, damage, interior…</small>
+            </div>
+
             <div className={`${styles.formGroup} ${styles.fullWidth}`}>
               <label className={styles.label}>Notes</label>
               <input
@@ -1842,6 +2082,27 @@ export default function EquipmentView() {
       </Modal>
 
       <Modal
+        isOpen={!!viewing}
+        onClose={() => setViewing(null)}
+        title={viewing?.unitNumber || "Equipment"}
+        size="lg"
+      >
+        <EquipmentDetailView
+          item={viewing}
+          assignedDriver={viewing ? resolveAssignedDriver(viewing) : null}
+          onClose={() => setViewing(null)}
+          onEdit={
+            canEditEquipment
+              ? (it) => {
+                  setViewing(null);
+                  openEdit(it);
+                }
+              : undefined
+          }
+        />
+      </Modal>
+
+      <Modal
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
         title="Delete Equipment"
@@ -1869,3 +2130,6 @@ export default function EquipmentView() {
     </div>
   );
 }
+
+
+

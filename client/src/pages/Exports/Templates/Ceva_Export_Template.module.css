@@ -1,0 +1,229 @@
+/* client/src/pages/Exports/Templates/Ceva_Export_Template.module.css
+   Print-only replica of CEVA's paper "Airline Transfer Manifest".
+   Deliberately plain black-on-white — this is meant to print/PDF cleanly,
+   not to match the app's dark theme. Sized for US Letter (8.5in). */
+
+.sheet {
+  width: 8.5in;
+  min-height: 11in;
+  padding: 0.3in 0.4in;
+  background: #ffffff;
+  color: #111111;
+  font-family: Georgia, 'Times New Roman', Times, serif;
+  box-sizing: border-box;
+}
+
+/* ── Header ── */
+.header {
+  display: grid;
+  grid-template-columns: 130px 1fr 220px;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.logo {
+  width: 120px;
+  height: auto;
+  object-fit: contain;
+}
+.title {
+  text-align: center;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.movementOrder {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 6px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.blankLine {
+  display: inline-block;
+  min-width: 90px;
+  border-bottom: 1px solid #111111;
+  padding-bottom: 1px;
+  min-height: 14px;
+}
+
+.transferToRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 10px 0 16px;
+}
+.transferToLabel {
+  font-size: 15px;
+  font-weight: 700;
+}
+.transferToValue {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 46px;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 17px;
+  font-weight: 700;
+  border: 2px solid #c0392b;
+  border-radius: 50%;
+  color: #111111;
+}
+
+/* ── Shipment table ── */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  table-layout: fixed;
+  margin-bottom: 10px;
+}
+.table th,
+.table td {
+  border: 1px solid #111111;
+  padding: 5px 6px;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: break-word;
+}
+.table thead th {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  text-align: center;
+  background: #eeeeee;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.table tbody td {
+  height: 26px;
+}
+.colNum { width: 26px; text-align: center; }
+.colMawb { width: 15%; }
+.colDest { width: 8%; }
+.colPieces { width: 7%; text-align: center; }
+.colWeight { width: 8%; text-align: center; }
+.colLockout { width: 13%; }
+.colRemarks { width: 18%; }
+.colLoose { width: 7%; text-align: center; }
+.colUld { width: 6%; text-align: center; }
+.colDg { width: 6%; text-align: center; }
+.mono { font-family: 'Courier New', monospace; }
+.remarksCell { font-size: 10.5px; }
+
+/* ── Check-in / check-out block ── */
+.checkTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+.checkTable td {
+  border: 1px solid #111111;
+  padding: 8px 10px;
+}
+.checkParty {
+  width: 90px;
+  font-weight: 700;
+  background: #dddddd;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.checkLabel {
+  width: 130px;
+  font-weight: 700;
+  background: #dddddd;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  white-space: nowrap;
+}
+.checkBlank {
+  min-width: 70px;
+}
+.printedStamp {
+  text-align: center;
+  font-size: 16px;
+  padding: 12px 0;
+  border-left: none;
+  border-right: none;
+}
+.printedStamp div:first-child {
+  margin-bottom: 4px;
+}
+
+/* ── Signature block ── */
+.signatureGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  margin-top: 8px;
+}
+.signatureCol {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.signatureIntro {
+  margin-bottom: 26px;
+}
+.signatureSub {
+  font-size: 11px;
+}
+.signatureLine {
+  border-top: 1px solid #111111;
+  margin-bottom: 10px;
+}
+.signatureFieldRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.fillLine {
+  flex: 1;
+  border-bottom: 1px solid #111111;
+  min-height: 14px;
+}
+.signatureSubLabel {
+  font-size: 10px;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.footer {
+  margin-top: 24px;
+  font-size: 9.5px;
+  color: #555555;
+}
+
+/* ── Print ──
+   Same technique as the working import permit template.
+   Hide the rest of the app, force the manifest onto the page. */
+@media print {
+  @page {
+    size: letter;
+    margin: 0.35in;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+  .sheet,
+  .sheet * {
+    visibility: visible !important;
+  }
+  .sheet {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    padding: 0.3in 0.4in !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    background: #fff !important;
+    color: #111 !important;
+  }
+}

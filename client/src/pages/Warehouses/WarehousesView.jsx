@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faPlus, faPencil, faTrash, faLocationDot,
+  faPlus, faPencil, faTrash, faEye, faLocationDot,
   faThLarge, faTable, faMagnifyingGlass,
   faChevronDown, faSort, faSortUp, faSortDown, faXmark,
+  faDolly, faShieldHalved, faDoorOpen, faCloudArrowUp,
 } from '@fortawesome/free-solid-svg-icons';
 import { getWarehouses, createWarehouse, updateWarehouse, deleteWarehouse } from '../../api/api.js';
 import Modal from '../../components/Modal/Modal.jsx';
 import TimePicker from '../../styles/TimePicker.jsx';
+import WarehouseDetailView from './WarehouseDetailView.jsx';
 import styles from './WarehousesView.module.css';
 import tableStyles from './WarehousesView.table.module.css';
 import LiveClock from '../../styles/Liveclock.jsx'; // adjust path to match your folder layout
@@ -24,7 +26,31 @@ const DAYS = [
 const DAY_ORDER = DAYS.map(d => d.key);
 const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI'];
 
-const INITIAL = { name: '', address: '', contactPhone: '', is24Hours: false, daysOpen: WEEKDAYS, openTime: '08:00', closeTime: '17:00', notes: '' };
+// Dock doors OR parking spots — one flexible numbered range covers both
+// ("Doors 1–20" or "Spots 20–30"), picked via bayType.
+const BAY_TYPES = [
+  { key: 'dock', label: 'Dock Doors' },
+  { key: 'parking', label: 'Parking Spots' },
+];
+
+const SECURITY_TYPES = [
+  { key: 'open', label: 'Open Access', icon: faDoorOpen },
+  { key: 'manned', label: 'Manned Gate', icon: faShieldHalved },
+  { key: 'keypad', label: 'Keypad Gate', icon: faShieldHalved },
+  { key: 'keycard', label: 'Keycard Gate', icon: faShieldHalved },
+];
+
+const MAX_IMAGES = 8;
+const MAX_IMAGE_MB = 3;
+
+const INITIAL = {
+  name: '', address: '', contactPhone: '', contactEmail: '',
+  is24Hours: false, daysOpen: WEEKDAYS, openTime: '08:00', closeTime: '17:00',
+  images: [],
+  bayType: 'dock', bayFrom: '', bayTo: '',
+  securityType: 'open', appointmentRequired: false, forkliftAvailable: false,
+  notes: '',
+};
 
 const VIEW_KEY = 'warehousesView.viewMode';
 
@@ -46,6 +72,18 @@ function formatHours(w) {
   const days = formatDays(w.daysOpen);
   const time = w.openTime && w.closeTime ? `${w.openTime}–${w.closeTime}` : '';
   return [days, time].filter(Boolean).join(' • ');
+}
+
+// "Doors 1–20" / "Spots 20–30" / "Doors 12" if only one bound was set
+function formatBay(w) {
+  if (w.bayFrom == null && w.bayTo == null) return null;
+  const label = w.bayType === 'parking' ? 'Spots' : 'Doors';
+  if (w.bayFrom != null && w.bayTo != null) return `${label} ${w.bayFrom}–${w.bayTo}`;
+  return `${label} ${w.bayFrom ?? w.bayTo}`;
+}
+
+function securityMeta(type) {
+  return SECURITY_TYPES.find(s => s.key === type) || null;
 }
 
 // Sort key derived per-column so clicking a header sorts on something meaningful,
@@ -71,6 +109,7 @@ export default function WarehousesView() {
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [editing, setEditing] = useState(null);
+  const [viewing, setViewing] = useState(null);
   const [form, setForm] = useState(INITIAL);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -98,10 +137,19 @@ export default function WarehousesView() {
   const openAdd = () => { setEditing(null); setForm(INITIAL); setError(''); setModalOpen(true); };
   const openEdit = (w) => {
     setEditing(w);
-    setForm({ ...INITIAL, ...w, daysOpen: w.daysOpen?.length ? w.daysOpen : WEEKDAYS });
+    setForm({
+      ...INITIAL,
+      ...w,
+      daysOpen: w.daysOpen?.length ? w.daysOpen : WEEKDAYS,
+      images: w.images?.length ? w.images : [],
+      bayFrom: w.bayFrom ?? '',
+      bayTo: w.bayTo ?? '',
+    });
     setError('');
     setModalOpen(true);
   };
+  const openView = (w) => setViewing(w);
+  const closeView = () => setViewing(null);
 
   const toggleDay = (key) => {
     setForm(f => ({
@@ -110,6 +158,26 @@ export default function WarehousesView() {
     }));
   };
   const closeModal = () => { setModalOpen(false); setEditing(null); setError(''); };
+
+  // Reads selected files client-side and stores them as base64 data URLs —
+  // no separate upload endpoint/storage bucket required to get this working.
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = ''; // allow re-selecting the same file later
+    const room = MAX_IMAGES - form.images.length;
+    if (room <= 0) { setError(`You can attach up to ${MAX_IMAGES} photos per warehouse.`); return; }
+    files.slice(0, room).forEach(file => {
+      if (!file.type.startsWith('image/')) return;
+      if (file.size > MAX_IMAGE_MB * 1024 * 1024) {
+        setError(`"${file.name}" is larger than ${MAX_IMAGE_MB}MB — pick a smaller photo.`);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => setForm(f => ({ ...f, images: [...f.images, reader.result] }));
+      reader.readAsDataURL(file);
+    });
+  };
+  const removeImage = (idx) => setForm(f => ({ ...f, images: f.images.filter((_, i) => i !== idx) }));
 
   const handleSubmit = async (e) => {
     e.preventDefault(); setSaving(true); setError('');
@@ -229,34 +297,53 @@ export default function WarehousesView() {
         </div>
       ) : viewMode === 'grid' ? (
         <div className={styles.grid}>
-          {sorted.map(w => (
-            <div key={w.id} className={styles.card}>
-              <div className={styles.cardTop}>
-                <div className={styles.whIcon}>{getInitials(w.name)}</div>
-                <div className={styles.whInfo}>
-                  <div className={styles.whName}>
-                    {w.name}
-                    {w.is24Hours && <span className={styles.badge24}>24/7</span>}
+          {sorted.map(w => {
+            const security = securityMeta(w.securityType);
+            const bay = formatBay(w);
+            return (
+              <div key={w.id} className={styles.card}>
+                <div className={styles.cardTop}>
+                  {w.images?.[0]
+                    ? <img src={w.images[0]} alt={w.name} className={styles.whThumb} />
+                    : <div className={styles.whIcon}>{getInitials(w.name)}</div>}
+                  <div className={styles.whInfo}>
+                    <div className={styles.whName}>
+                      {w.name}
+                      {w.is24Hours && <span className={styles.badge24}>24/7</span>}
+                    </div>
+                    <div className={styles.whHours}>🕐 {formatHours(w)}</div>
                   </div>
-                  <div className={styles.whHours}>🕐 {formatHours(w)}</div>
+                  <div className={styles.cardActions}>
+                    <button className={styles.viewBtn} onClick={() => openView(w)} title="View"><FontAwesomeIcon icon={faEye} /></button>
+                    <button className={styles.editBtn} onClick={() => openEdit(w)} title="Edit"><FontAwesomeIcon icon={faPencil} /></button>
+                    <button className={styles.deleteBtn} onClick={() => setDeleteId(w.id)} title="Delete"><FontAwesomeIcon icon={faTrash} /></button>
+                  </div>
                 </div>
-                <div className={styles.cardActions}>
-                  <button className={styles.editBtn} onClick={() => openEdit(w)} title="Edit"><FontAwesomeIcon icon={faPencil} /></button>
-                  <button className={styles.deleteBtn} onClick={() => setDeleteId(w.id)} title="Delete"><FontAwesomeIcon icon={faTrash} /></button>
+                <div className={styles.cardBody}>
+                  {w.address && (
+                    <div className={styles.infoRow}>
+                      <FontAwesomeIcon icon={faLocationDot} />
+                      <span>{w.address}</span>
+                    </div>
+                  )}
+                  {w.contactPhone && <div className={styles.infoRow}><span>📞</span><span>{w.contactPhone}</span></div>}
+                  {bay && (
+                    <div className={styles.infoRow}>
+                      <FontAwesomeIcon icon={faDolly} />
+                      <span>{bay}</span>
+                    </div>
+                  )}
+                  {security && (
+                    <div className={styles.infoRow}>
+                      <FontAwesomeIcon icon={security.icon} />
+                      <span>{security.label}</span>
+                    </div>
+                  )}
+                  {w.notes && <p className={styles.notes}>{w.notes}</p>}
                 </div>
               </div>
-              <div className={styles.cardBody}>
-                {w.address && (
-                  <div className={styles.infoRow}>
-                    <FontAwesomeIcon icon={faLocationDot} />
-                    <span>{w.address}</span>
-                  </div>
-                )}
-                {w.contactPhone && <div className={styles.infoRow}><span>📞</span><span>{w.contactPhone}</span></div>}
-                {w.notes && <p className={styles.notes}>{w.notes}</p>}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className={tableStyles.tableWrap}>
@@ -278,6 +365,8 @@ export default function WarehousesView() {
             <tbody>
               {sorted.map(w => {
                 const isOpen = expandedIds.has(w.id);
+                const security = securityMeta(w.securityType);
+                const bay = formatBay(w);
                 return (
                   <React.Fragment key={w.id}>
                     <tr
@@ -289,7 +378,9 @@ export default function WarehousesView() {
                       </td>
                       <td>
                         <div className={tableStyles.tName}>
-                          <div className={tableStyles.tIcon}>{getInitials(w.name)}</div>
+                          {w.images?.[0]
+                            ? <img src={w.images[0]} alt={w.name} className={tableStyles.tThumb} />
+                            : <div className={tableStyles.tIcon}>{getInitials(w.name)}</div>}
                           <span>{w.name}</span>
                           {w.is24Hours && <span className={styles.badge24}>24/7</span>}
                         </div>
@@ -299,6 +390,7 @@ export default function WarehousesView() {
                       <td className={tableStyles.tMono}>{w.contactPhone || '—'}</td>
                       <td className={tableStyles.tdActions} onClick={e => e.stopPropagation()}>
                         <div className={tableStyles.actionsRow}>
+                          <button className={styles.viewBtn} onClick={() => openView(w)} title="View"><FontAwesomeIcon icon={faEye} /></button>
                           <button className={styles.editBtn} onClick={() => openEdit(w)} title="Edit"><FontAwesomeIcon icon={faPencil} /></button>
                           <button className={styles.deleteBtn} onClick={() => setDeleteId(w.id)} title="Delete"><FontAwesomeIcon icon={faTrash} /></button>
                         </div>
@@ -312,6 +404,18 @@ export default function WarehousesView() {
                               <div className={tableStyles.expandItem}>
                                 <FontAwesomeIcon icon={faLocationDot} />
                                 <span>{w.address}</span>
+                              </div>
+                            )}
+                            {bay && (
+                              <div className={tableStyles.expandItem}>
+                                <FontAwesomeIcon icon={faDolly} />
+                                <span>{bay}</span>
+                              </div>
+                            )}
+                            {security && (
+                              <div className={tableStyles.expandItem}>
+                                <FontAwesomeIcon icon={security.icon} />
+                                <span>{security.label}</span>
                               </div>
                             )}
                             {w.notes
@@ -330,6 +434,7 @@ export default function WarehousesView() {
         </div>
       )}
 
+      {/* ── Add / Edit ── */}
       <Modal isOpen={modalOpen} onClose={closeModal} title={editing ? 'Edit Warehouse' : 'Add Warehouse'} size="md">
         <form onSubmit={handleSubmit} id="warehouse-form" className={styles.form}>
           {error && <div className={styles.formError}>{error}</div>}
@@ -346,6 +451,11 @@ export default function WarehousesView() {
               <label className={styles.label}>Contact Phone</label>
               <input id="wh-phone" className={styles.input} value={form.contactPhone} onChange={e => setForm(f => ({ ...f, contactPhone: e.target.value }))} placeholder="(310) 555-0000" />
             </div>
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Contact Email</label>
+              <input id="wh-email" type="email" className={styles.input} value={form.contactEmail} onChange={e => setForm(f => ({ ...f, contactEmail: e.target.value }))} placeholder="dock@warehouse.com" />
+            </div>
+
             <div className={`${styles.formGroup} ${styles.fullWidth}`}>
               <label className={styles.label}>Operating Hours</label>
 
@@ -403,6 +513,59 @@ export default function WarehousesView() {
                 </div>
               )}
             </div>
+
+            <div className={`${styles.formGroup} ${styles.fullWidth}`}>
+              <label className={styles.label}>Dock Doors / Parking</label>
+              <div className={styles.bayRow}>
+                <select className={styles.input} value={form.bayType} onChange={e => setForm(f => ({ ...f, bayType: e.target.value }))}>
+                  {BAY_TYPES.map(b => <option key={b.key} value={b.key}>{b.label}</option>)}
+                </select>
+                <input type="number" min="0" className={styles.input} placeholder="From" value={form.bayFrom} onChange={e => setForm(f => ({ ...f, bayFrom: e.target.value }))} />
+                <span className={styles.bayDash}>–</span>
+                <input type="number" min="0" className={styles.input} placeholder="To" value={form.bayTo} onChange={e => setForm(f => ({ ...f, bayTo: e.target.value }))} />
+              </div>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Gate Security</label>
+              <select className={styles.input} value={form.securityType} onChange={e => setForm(f => ({ ...f, securityType: e.target.value }))}>
+                {SECURITY_TYPES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+              </select>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Facility</label>
+              <label className={styles.checkRow}>
+                <input type="checkbox" checked={form.appointmentRequired} onChange={e => setForm(f => ({ ...f, appointmentRequired: e.target.checked }))} />
+                Appointment required
+              </label>
+              <label className={styles.checkRow}>
+                <input type="checkbox" checked={form.forkliftAvailable} onChange={e => setForm(f => ({ ...f, forkliftAvailable: e.target.checked }))} />
+                Forklift on site
+              </label>
+            </div>
+
+            <div className={`${styles.formGroup} ${styles.fullWidth}`}>
+              <label className={styles.label}>Photos ({form.images.length}/{MAX_IMAGES})</label>
+              <div className={styles.imageGrid}>
+                {form.images.map((src, i) => (
+                  <div key={i} className={styles.imageThumb}>
+                    <img src={src} alt={`Warehouse photo ${i + 1}`} />
+                    <button type="button" className={styles.imageRemoveBtn} onClick={() => removeImage(i)} title="Remove">
+                      <FontAwesomeIcon icon={faXmark} />
+                    </button>
+                  </div>
+                ))}
+                {form.images.length < MAX_IMAGES && (
+                  <label className={styles.imageUploadBtn}>
+                    <FontAwesomeIcon icon={faCloudArrowUp} />
+                    <span>Add photo</span>
+                    <input type="file" accept="image/*" multiple hidden onChange={handleImageUpload} />
+                  </label>
+                )}
+              </div>
+            </div>
+
             <div className={`${styles.formGroup} ${styles.fullWidth}`}>
               <label className={styles.label}>Notes</label>
               <textarea id="wh-notes" className={styles.textarea} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} placeholder="Additional information…" />
@@ -417,6 +580,7 @@ export default function WarehousesView() {
         </form>
       </Modal>
 
+      {/* ── Delete confirm ── */}
       <Modal isOpen={!!deleteId} onClose={() => setDeleteId(null)} title="Delete Warehouse" size="sm">
         <p className={styles.confirmText}>Delete this warehouse? This cannot be undone.</p>
         <div className={styles.formActions}>
@@ -424,9 +588,22 @@ export default function WarehousesView() {
           <button className={styles.deleteConfirmBtn} onClick={handleDelete} id="wh-delete-confirm">Delete</button>
         </div>
       </Modal>
+
+      {/* ── Full detail view (separated component) ── */}
+      <Modal isOpen={!!viewing} onClose={closeView} title={viewing?.name || 'Warehouse'} size="lg">
+        <WarehouseDetailView
+          warehouse={viewing}
+          onClose={closeView}
+          onEdit={(w) => {
+            closeView();
+            openEdit(w);
+          }}
+        />
+      </Modal>
     </div>
   );
 }
+
 
 
 

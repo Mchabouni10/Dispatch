@@ -26,25 +26,38 @@ export const API_ORIGIN = (typeof window !== 'undefined' && (window.location.hos
   ? `${window.location.protocol}//${window.location.hostname}:5001`
   : '';
 
+// /uploads now requires auth (server/middleware/protectUploads.js) — driver
+// license/medical/passport/badge scans used to be served with no auth check
+// at all. A plain <img src="..."> can't attach an Authorization header, so
+// the session token is appended as a query param instead; protectUploads
+// accepts either the header (for fetch/XHR use) or ?token= (for <img>/<a>
+// use), preferring the header when both are present.
+function withAuthToken(url) {
+  const token = getAuthToken();
+  if (!token) return url;
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}token=${encodeURIComponent(token)}`;
+}
+
 // ✅ FIXED: resolveUploadUrl - properly handles logo URLs
 export const resolveUploadUrl = (filePath) => {
   if (!filePath) return '';
-  
+
   // If it's already an absolute URL (http or https), return as is
-  if (/^https?:\/\//i.test(filePath)) return filePath;
-  
+  if (/^https?:\/\//i.test(filePath)) return withAuthToken(filePath);
+
   // If it starts with /uploads, prepend the API origin
   if (filePath.startsWith('/uploads')) {
-    return `${API_ORIGIN}${filePath}`;
+    return withAuthToken(`${API_ORIGIN}${filePath}`);
   }
-  
+
   // If it's just a filename, assume it's in /uploads
   if (!filePath.startsWith('/')) {
-    return `${API_ORIGIN}/uploads/${filePath}`;
+    return withAuthToken(`${API_ORIGIN}/uploads/${filePath}`);
   }
-  
+
   // Fallback: prepend API origin
-  return `${API_ORIGIN}${filePath}`;
+  return withAuthToken(`${API_ORIGIN}${filePath}`);
 };
 
 async function request(path, options = {}) {
@@ -63,6 +76,9 @@ async function request(path, options = {}) {
     clearAuthToken();
     window.dispatchEvent(new Event('dispatch:auth-expired'));
   }
+  if (res.status === 403 && data?.code === 'PASSWORD_CHANGE_REQUIRED') {
+    window.dispatchEvent(new Event('dispatch:password-change-required'));
+  }
   if (!res.ok) throw new Error(data?.message || 'Request failed');
   return data;
 }
@@ -70,6 +86,20 @@ async function request(path, options = {}) {
 export const register = (body) => request('/auth/register', { method: 'POST', body: JSON.stringify(body) });
 export const login = (body) => request('/auth/login', { method: 'POST', body: JSON.stringify(body) });
 export const getCurrentUser = () => request('/auth/me');
+// Tells AuthView whether this is a fresh install (show sign-up) or an
+// established one (sign-up is closed, show login only). Public — no token yet.
+export const getBootstrapStatus = () => request('/auth/bootstrap-status');
+// Completes the forced first-login password change. currentPassword is the
+// temp password the admin handed over; the server verifies it before
+// accepting newPassword.
+export const changePassword = (currentPassword, newPassword) =>
+  request('/auth/password', { method: 'PATCH', body: JSON.stringify({ currentPassword, newPassword }) });
+export const getUsers = () => request('/users');
+// Admin-created account. Returns { user, tempPassword } — tempPassword is
+// shown exactly once by the caller and never retrievable again.
+export const createUser = (body) => request('/users', { method: 'POST', body: JSON.stringify(body) });
+export const updateUserRole = (id, role) => request(`/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) });
+export const deleteUser = (id) => request(`/users/${id}`, { method: 'DELETE' });
 
 // ── DRIVERS ──────────────────────────────────────────────────────────────────
 export const getDrivers = () => request('/drivers');
@@ -114,6 +144,60 @@ export const uploadDriverLicensePhoto = async (id, file) => {
   return data;
 };
 
+/** Optional DOT medical card scan */
+export const uploadDriverMedicalPhoto = async (id, file) => {
+  if (!id) throw new Error('Driver ID is required to upload a medical card scan');
+  if (!file) throw new Error('No file provided');
+
+  const formData = new FormData();
+  formData.append('medicalPhoto', file);
+
+  const res = await fetch(`${BASE}/drivers/${id}/medical-photo`, {
+    method: 'POST',
+    body: formData,
+    headers: authHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Medical card upload failed');
+  return data;
+};
+
+/** Optional airport / SIDA badge scan */
+export const uploadDriverAirportBadgePhoto = async (id, file) => {
+  if (!id) throw new Error('Driver ID is required to upload an airport badge scan');
+  if (!file) throw new Error('No file provided');
+
+  const formData = new FormData();
+  formData.append('airportBadgePhoto', file);
+
+  const res = await fetch(`${BASE}/drivers/${id}/airport-badge-photo`, {
+    method: 'POST',
+    body: formData,
+    headers: authHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Airport badge upload failed');
+  return data;
+};
+
+/** Optional passport scan (cross-border) */
+export const uploadDriverPassportPhoto = async (id, file) => {
+  if (!id) throw new Error('Driver ID is required to upload a passport scan');
+  if (!file) throw new Error('No file provided');
+
+  const formData = new FormData();
+  formData.append('passportPhoto', file);
+
+  const res = await fetch(`${BASE}/drivers/${id}/passport-photo`, {
+    method: 'POST',
+    body: formData,
+    headers: authHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Passport upload failed');
+  return data;
+};
+
 // ── DRIVER HISTORY ──────────────────────────────────────────────────────────
 /** Get complete equipment history for a driver */
 export const getDriverHistory = (id, params = {}) => {
@@ -130,11 +214,39 @@ export const getActiveHandoffs = (driverId) => {
 export const getEquipment = (type) => request(`/equipment${type ? `?type=${type}` : ''}`);
 export const createEquipment = (body) => request('/equipment', { method: 'POST', body: JSON.stringify(body) });
 export const updateEquipment = (id, body) => request(`/equipment/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+// Status-only update (e.g. mark Out of Service / back In Service) — the one
+// write action Dispatcher can take on equipment without full edit rights.
+// Kept separate from updateEquipment (PUT), which requires 'full'.
+export const updateEquipmentStatus = (id, body) => request(`/equipment/${id}/status`, { method: 'PATCH', body: JSON.stringify(body) });
 // Handoff Board: assign a unit to a driver ({ driverId }) or release it
 // ({ release: true, cooldownMinutes }). Kept as its own endpoint since the
 // general PUT above strips null values and can't clear assignedDriverId.
 export const assignEquipment = (id, body) => request(`/equipment/${id}/assign`, { method: 'PATCH', body: JSON.stringify(body) });
 export const deleteEquipment = (id) => request(`/equipment/${id}`, { method: 'DELETE' });
+
+// ── EQUIPMENT PHOTOS ──────────────────────────────────────────────────────────
+export const uploadEquipmentPhoto = async (id, file) => {
+  if (!id) throw new Error('Equipment ID is required to upload a photo');
+  if (!file) throw new Error('No file provided');
+  const formData = new FormData();
+  formData.append('photo', file);
+  const res = await fetch(`${BASE}/equipment/${id}/photos`, {
+    method: 'POST',
+    body: formData,
+    headers: authHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Equipment photo upload failed');
+  return data;
+};
+
+export const deleteEquipmentPhoto = async (id, path) => {
+  return request(`/equipment/${id}/photos`, {
+    method: 'DELETE',
+    body: JSON.stringify({ path }),
+  });
+};
+
 
 // ── EQUIPMENT HISTORY ───────────────────────────────────────────────────────
 /** Get complete history for a specific equipment unit */
@@ -221,3 +333,8 @@ export const deleteTrip = (id) => request(`/dispatch/${id}`, { method: 'DELETE' 
 // (parentTripId = id) with a backup driver/truck/trailer, moving or splitting
 // the selected AWBs over. Returns { parentTrip, backupTrip }, both populated.
 export const createTripBackup = (id, body) => request(`/dispatch/${id}/backups`, { method: 'POST', body: JSON.stringify(body) });
+
+
+
+
+

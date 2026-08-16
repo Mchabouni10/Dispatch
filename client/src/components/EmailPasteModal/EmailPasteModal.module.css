@@ -1,0 +1,120 @@
+/* client/src/components/EmailPasteModal/EmailPasteModal.module.css */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted, #8892a6);
+  line-height: 1.5;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 220px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border, #2a2f3d);
+  background: var(--input-bg, #12151f);
+  color: var(--text, #e8ebf2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--accent, #4f8ef7);
+}
+
+.matchList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.matchItem {
+  display: grid;
+  grid-template-columns: 18px 130px 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--card-bg, #171b26);
+  font-size: 13px;
+}
+
+.matched .matchIcon {
+  color: var(--success, #00d084);
+}
+
+.unmatched .matchIcon {
+  color: var(--text-faint, #565d70);
+}
+
+/* Unmatched AND critical (AWB, pieces, weight, airline, warehouse, ORD #) —
+   distinct from a plain unmatched/tolerant miss so it stands out as
+   "you must fill this in", not just "we didn't happen to find it". */
+.unmatchedCritical {
+  background: var(--danger-bg, rgba(255, 71, 87, 0.08));
+}
+
+.unmatchedCritical .matchIcon {
+  color: var(--danger, #ff4757);
+}
+
+.unmatchedCritical .matchLabel {
+  color: var(--danger, #ff4757);
+}
+
+.criticalTag {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--danger, #ff4757);
+  margin-left: 6px;
+}
+
+.warningBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--danger-bg, rgba(255, 71, 87, 0.08));
+  border: 1px solid rgba(255, 71, 87, 0.3);
+  color: var(--danger, #ff4757);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.matched .matchValue {
+  color: var(--text, #e8ebf2);
+}
+
+.unmatched .matchValue {
+  color: var(--text-faint, #565d70);
+  font-style: italic;
+}
+
+.matchLabel {
+  font-weight: 600;
+  color: var(--text-muted, #8892a6);
+}
+
+.matchValue {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

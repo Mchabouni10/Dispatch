@@ -1,7 +1,26 @@
+# Dependencies
 node_modules/
 client/node_modules/
 server/node_modules/
+
+# Build output
 client/dist/
-server/.env
+
+# Environment — never commit real secrets
+.env
+.env.local
+.env.*
+!.env.example
+
+# Uploaded files (driver/equipment photos, POD images, signatures) —
+# user-generated content, not source; shouldn't live in git
 server/uploads/
+
+# OS / editor cruft
 .DS_Store
+.vscode/
+.idea/
+
+# Logs
+*.log
+*.tmp

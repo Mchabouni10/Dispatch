@@ -1,4 +1,5 @@
 // prisma/models/driver.prisma
+// If you use a single schema.prisma, merge these fields into model Driver there.
 model Driver {
   id                    String   @id @default(cuid())
   // ─── IDENTITY ───
@@ -10,13 +11,13 @@ model Driver {
   address               String?
   dateOfBirth           DateTime?
   gender                String?  @db.VarChar(10)
-  
+
   // ─── AVAILABILITY ───
   status                String   @default("Available")
   statusReason          String?
   leaveStart            DateTime?
   leaveEnd              DateTime?
-  
+
   // ─── SCHEDULE ───
   schedule              String   @db.VarChar(100)
   shiftStart            String?  @db.VarChar(5)
@@ -25,21 +26,27 @@ model Driver {
   availableOnDaysOff    Boolean  @default(false)
   overtimePreference    Boolean  @default(false)
   maxWeeklyHours        Int      @default(60)
-  
-  // ─── VEHICLE ELIGIBILITY ───
+
+  // ─── VEHICLE ELIGIBILITY & DOCUMENTS ───
   licenseNumber         String?
   licenseClass          String   @default("A") @db.VarChar(1)
   licenseExpiration     DateTime?
   licensePhoto          String?  @db.VarChar(255)
   medicalCertExpiration DateTime?
+  /// Optional scan of DOT medical card
+  medicalCertPhoto      String?  @db.VarChar(255)
+  /// Optional airport / SIDA badge photo
+  airportBadgePhoto     String?  @db.VarChar(255)
+  /// Optional passport photo (cross-border runs)
+  passportPhoto         String?  @db.VarChar(255)
   endorsements          String[]
   vehicleTypes          String[]
   trailerEligible       Boolean  @default(true)
   hazmatCertified       Boolean  @default(false)
   gdpTrained            Boolean  @default(false)
-  
+
   // ─── TRACKING ───
-  currentLocation       String?  
+  currentLocation       String?
   currentLatitude       Float?
   currentLongitude      Float?
   lastCheckin           DateTime?
@@ -49,45 +56,45 @@ model Driver {
   breakUntil            DateTime?
   shiftStartTime        DateTime?
   shiftEndTime          DateTime?
-  
+
   // ─── PREFERENCES ───
   preferredRunTypes     String[]
-  homeBase              String?  
-  maxRadius             Int?     
+  homeBase              String?
+  maxRadius             Int?
   overnightAllowed      Boolean  @default(true)
   crossBorder           Boolean  @default(false)
-  
+
   // ─── PERFORMANCE ───
   performanceRating     Float?   @default(3.0)
   totalTripsCompleted   Int      @default(0)
   onTimeDeliveryRate    Float?   @default(100.0)
   safetyScore           Float?   @default(100.0)
   incidents             Int      @default(0)
-  
+
   // ─── COMPENSATION ───
   hireDate              DateTime?
   employmentStatus      String   @default("Active")
   payType               String   @default("Hourly")
   payRate               Float    @default(0)
-  overtimeRate          Float?   
+  overtimeRate          Float?
   bonusEligible         Boolean  @default(false)
   lastPayRaise          DateTime?
-  
+
   // ─── CONTACT ───
-  emergencyContactName  String?
-  emergencyContactPhone String?  @db.VarChar(20)
+  emergencyContactName     String?
+  emergencyContactPhone    String?  @db.VarChar(20)
   emergencyContactRelation String?
-  
+
   // ─── NOTES ───
   notes                 String?
   specialSkills         String?
-  medicalConditions     String?  
+  medicalConditions     String?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
   // ─── RELATIONS ───
   trips                 Trip[]
   assignedEquipment     Equipment[]
-  equipmentHandoffs     EquipmentHandoff[]                    // primary driver on the handoff
-  handoffsAsApprover    EquipmentHandoff[] @relation("ApproverDriver")  // when this driver is the dispatcher/approver
+  equipmentHandoffs     EquipmentHandoff[]
+  handoffsAsApprover    EquipmentHandoff[] @relation("ApproverDriver")
 }

@@ -1,5 +1,11 @@
 // client/src/pages/Imports/ImportsView.jsx
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faPlus,
@@ -18,12 +24,15 @@ import {
   faCalendarCheck,
   faFileLines,
   faSnowflake,
+  faSkullCrossbones,
   faMoneyBillWave,
   faPallet,
   faCircleCheck,
   faTable,
   faThLarge,
   faChevronDown,
+  faEnvelopeOpenText,
+  faFileCsv,
 } from "@fortawesome/free-solid-svg-icons";
 import { useReactToPrint } from "react-to-print";
 import {
@@ -42,6 +51,14 @@ import CevaTemplate from "../Imports/Templates/Ceva-template.jsx";
 import styles from "./ImportsView.module.css";
 import LiveClock from "../../styles/Liveclock.jsx"; // adjust path to match your folder layout
 import tableStyles from "./ImportsView.table.module.css";
+import EmailPasteModal from "../../components/EmailPasteModal/EmailPasteModal.jsx";
+import CsvImportModal from "../../components/CsvImportModal/CsvImportModal.jsx";
+import {
+  IMPORT_FIELD_SEVERITY,
+  getFieldStatus,
+  hasCriticalMissing,
+  describeMissingCritical,
+} from "../../utils/fieldSeverity.js";
 
 const AIRLINE_PALETTE = [
   "#00d4ff",
@@ -93,6 +110,45 @@ function storageDaysOver(lastFreeDay) {
   return 0;
 }
 
+// Local-day boundaries (not UTC) so "Today" / "This Week" line up with what
+// the dispatcher actually sees on their clock.
+function startOfDay(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+function endOfDay(d) {
+  const x = new Date(d);
+  x.setHours(23, 59, 59, 999);
+  return x;
+}
+// Week = Sunday through Saturday of the current week.
+function startOfWeek(d) {
+  const x = startOfDay(d);
+  x.setDate(x.getDate() - x.getDay());
+  return x;
+}
+
+function matchesGeneratedFilter(permitGeneratedAt, mode, from, to) {
+  if (!mode) return true; // "Any time"
+  if (!permitGeneratedAt) return false; // never generated, can't match a date range
+  const generated = new Date(permitGeneratedAt);
+  const now = new Date();
+  if (mode === "today") {
+    return generated >= startOfDay(now) && generated <= endOfDay(now);
+  }
+  if (mode === "week") {
+    return generated >= startOfWeek(now) && generated <= endOfDay(now);
+  }
+  if (mode === "custom") {
+    if (!from && !to) return true; // range not fully set yet — don't filter anything out
+    if (from && generated < startOfDay(from)) return false;
+    if (to && generated > endOfDay(to)) return false;
+    return true;
+  }
+  return true;
+}
+
 function daysUntil(lastFreeDay) {
   if (!lastFreeDay) return null;
   const lfd = new Date(lastFreeDay);
@@ -106,11 +162,14 @@ const INITIAL = {
   type: "Import",
   airwaybillNumber: "",
   ordNumber: "",
+  originCity: "",
+  flightNumber: "",
   airline: "",
   warehouse: "",
   pieces: "",
   weight: "",
   weightUnit: "lb",
+  flightEta: "",
   lastFreeDay: "",
   storageFeePerDay: "",
   storageFeePaid: false,
@@ -118,6 +177,8 @@ const INITIAL = {
   terminalFeePaid: false,
   isGDP: false,
   gdpTemperatureRange: "",
+  isHazmat: false,
+  hazmatClass: "",
   pmcCount: "",
   pickupReadyAt: "",
   deliveryAppointmentAt: "",
@@ -134,6 +195,10 @@ export default function ImportsView() {
   const [filterAirline, setFilterAirline] = useState("");
   const [filterWarehouse, setFilterWarehouse] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  // "" = any time, "today", "week", or "custom" (uses generatedFrom/To below)
+  const [filterGenerated, setFilterGenerated] = useState("");
+  const [generatedFrom, setGeneratedFrom] = useState("");
+  const [generatedTo, setGeneratedTo] = useState("");
   const [groupByAirline, setGroupByAirline] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
@@ -142,13 +207,36 @@ export default function ImportsView() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [selectedAirline, setSelectedAirline] = useState(null);
+
+  // ── Field-severity flagging ────────────────────────────────────
+  // Derived live from current form state, not just at parse time — so a
+  // field that's red because it was missing from the email clears the
+  // moment the dispatcher types a value in, and the same flags apply
+  // whether the form was opened via "New Import Permit" or a parsed email.
+  const fieldStatus = (key) =>
+    getFieldStatus(form[key], IMPORT_FIELD_SEVERITY[key]);
+  const formGroupClass = (key) => {
+    const status = fieldStatus(key);
+    if (status === "missing-critical") return styles.formGroupCritical;
+    if (status === "missing-tolerant") return styles.formGroupTolerant;
+    return styles.formGroup;
+  };
+  const saveDisabled =
+    saving || hasCriticalMissing(form, IMPORT_FIELD_SEVERITY);
+
   const VIEW_KEY = "importsViewMode";
   const [viewMode, setViewMode] = useState(() => {
-    try { return localStorage.getItem(VIEW_KEY) || "cards"; } catch { return "cards"; }
+    try {
+      return localStorage.getItem(VIEW_KEY) || "cards";
+    } catch {
+      return "cards";
+    }
   });
   const switchView = (mode) => {
     setViewMode(mode);
-    try { localStorage.setItem(VIEW_KEY, mode); } catch {}
+    try {
+      localStorage.setItem(VIEW_KEY, mode);
+    } catch {}
   };
   const [expandedIds, setExpandedIds] = useState(() => new Set());
   const toggleExpanded = (id) => {
@@ -159,23 +247,58 @@ export default function ImportsView() {
     });
   };
 
+  // ── Paste-email prefill ──────────────────────────────────────────
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const openEmailPaste = () => setEmailModalOpen(true);
+  const handleEmailFields = (fields) => {
+    setEditing(null);
+    setSelectedAirline(airlines.find((a) => a.id === fields.airline) || null);
+    setForm({ ...INITIAL, weightUnit: "lb", ...fields });
+    setEmailModalOpen(false);
+    setError("");
+    setModalOpen(true);
+  };
+  // ───────────────────────────────────────────────────────────────
+
+  // ── CSV bulk import (dispatch/recovery log) ──────────────────────
+  const [csvModalOpen, setCsvModalOpen] = useState(false);
+  // ───────────────────────────────────────────────────────────────
+
   // ── Print permit (react-to-print) ─────────────────────────────
   const printRef = useRef(null);
   const [printJob, setPrintJob] = useState(null); // { shipment, nonce }
 
   const triggerPrint = useReactToPrint({
-    contentRef: printRef, // react-to-print v2: use content: () => printRef.current
+    contentRef: printRef,
+    pageStyle:
+      "@page { size: auto; margin: 0mm !important; } @media print { body { margin: 0 !important; -webkit-print-color-adjust: exact; } }",
     documentTitle: printJob
       ? `CEVA-Permit-${printJob.shipment.awbDisplay || printJob.shipment.airwaybillNumber || "draft"}`
       : "CEVA-Permit",
   });
 
-  const requestPrint = (s) => setPrintJob({ shipment: s, nonce: Date.now() });
+  const requestPrint = (s) => {
+    setPrintJob({ shipment: s, nonce: Date.now() });
+    // Stamp when this permit was (re)generated so the "Generated" date
+    // filter (Today / This Week / Custom range) below has something to
+    // filter on. Applied optimistically so the filter is accurate right
+    // away; persisted in the background and non-fatal if it fails — the
+    // print itself should never be blocked on this.
+    const generatedAt = new Date().toISOString();
+    setShipments((prev) =>
+      prev.map((row) =>
+        row.id === s.id ? { ...row, permitGeneratedAt: generatedAt } : row,
+      ),
+    );
+    updateShipment(s.id, { permitGeneratedAt: generatedAt }).catch(() => {});
+  };
 
+  // The print target (below, in the JSX) is now ALWAYS mounted off-screen,
+  // so printRef.current is never null — no more racing a setTimeout against
+  // React's commit.
   useEffect(() => {
     if (!printJob) return;
-    const t = setTimeout(() => triggerPrint(), 150); // wait for template to render
-    return () => clearTimeout(t);
+    triggerPrint();
   }, [printJob, triggerPrint]);
   // ───────────────────────────────────────────────────────────────
 
@@ -216,9 +339,12 @@ export default function ImportsView() {
       ...s,
       airwaybillNumber: s.airwaybillNumber || "",
       ordNumber: s.ordNumber || "",
+      originCity: s.originCity || "",
+      flightNumber: s.flightNumber || "",
       airline: s.airline?.id || "",
       warehouse: s.warehouse?.id || "",
       weightUnit: s.weightUnit || "lb",
+      flightEta: s.flightEta || "",
       lastFreeDay: s.lastFreeDay ? s.lastFreeDay.split("T")[0] : "",
       pickupReadyAt: s.pickupReadyAt || "",
       deliveryAppointmentAt: s.deliveryAppointmentAt || "",
@@ -226,6 +352,8 @@ export default function ImportsView() {
       terminalFeePaid: s.terminalFeePaid || false,
       isGDP: s.isGDP || false,
       gdpTemperatureRange: s.gdpTemperatureRange || "",
+      isHazmat: s.isHazmat || false,
+      hazmatClass: s.hazmatClass || "",
       pmcCount: s.pmcCount || "",
     });
     setError("");
@@ -263,18 +391,19 @@ export default function ImportsView() {
         warehouseId: warehouse || null,
         airwaybillNumber: form.airwaybillNumber.trim(),
         ordNumber: form.ordNumber.trim(),
+        originCity: (form.originCity || "").trim(),
+        flightNumber: (form.flightNumber || "").trim(),
         pieces: Number(form.pieces),
         weight: Number(form.weight),
         weightUnit: form.weightUnit || "lb",
+        flightEta: form.flightEta || null,
         storageFeePerDay: Number(form.storageFeePerDay) || 0,
         terminalFee: Number(form.terminalFee) || 0,
         pmcCount: Number(form.pmcCount) || 0,
         isGDP: form.isGDP || false,
       };
-      if (!payload.airwaybillNumber) throw new Error("Enter the AWB number");
-      if (!payload.ordNumber) throw new Error("Enter the ORD number");
-      if (!payload.pieces) throw new Error("Enter the number of pieces");
-      if (!payload.weight) throw new Error("Enter the weight");
+      const missingMsg = describeMissingCritical(form, IMPORT_FIELD_SEVERITY);
+      if (missingMsg) throw new Error(missingMsg);
       if (editing) await updateShipment(editing.id, payload);
       else await createShipment(payload);
       await load();
@@ -298,10 +427,17 @@ export default function ImportsView() {
   };
 
   const filtered = shipments.filter((s) => {
-    const term = search.toLowerCase();
+    const term = search.toLowerCase().replace(/[\s-]/g, "");
+    const rawAwb = s.airwaybillNumber?.toLowerCase().replace(/[\s-]/g, "");
+    const fullAwb = s.airline?.awbPrefix
+      ? `${s.airline.awbPrefix}${s.airwaybillNumber || ""}`
+          .toLowerCase()
+          .replace(/[\s-]/g, "")
+      : rawAwb;
     const matchSearch =
       !term ||
-      s.airwaybillNumber?.toLowerCase().includes(term) ||
+      rawAwb?.includes(term) ||
+      fullAwb?.includes(term) ||
       s.ordNumber?.toLowerCase().includes(term) ||
       s.airline?.name?.toLowerCase().includes(term) ||
       s.airline?.code?.toLowerCase().includes(term);
@@ -310,12 +446,31 @@ export default function ImportsView() {
       ? s.warehouse?.id === filterWarehouse
       : true;
     const matchStatus = filterStatus ? s.status === filterStatus : true;
-    return matchSearch && matchAirline && matchWarehouse && matchStatus;
+    const matchGenerated = matchesGeneratedFilter(
+      s.permitGeneratedAt,
+      filterGenerated,
+      generatedFrom,
+      generatedTo,
+    );
+    return (
+      matchSearch &&
+      matchAirline &&
+      matchWarehouse &&
+      matchStatus &&
+      matchGenerated
+    );
   });
 
   const stats = useMemo(() => {
-    const overdue = shipments.filter((s) => storageDaysOver(s.lastFreeDay) > 0);
+    // Storage-fee alerts only count open permits (not Completed/Cancelled)
+    const overdue = shipments.filter(
+      (s) =>
+        storageDaysOver(s.lastFreeDay) > 0 &&
+        s.status !== "Completed" &&
+        s.status !== "Cancelled",
+    );
     const gdp = shipments.filter((s) => s.isGDP);
+    const hazmat = shipments.filter((s) => s.isHazmat);
     const completed = shipments.filter((s) => s.status === "Completed");
     return {
       total: shipments.length,
@@ -323,6 +478,7 @@ export default function ImportsView() {
       weight: shipments.reduce((sum, s) => sum + (Number(s.weight) || 0), 0),
       overdue: overdue.length,
       gdp: gdp.length,
+      hazmat: hazmat.length,
       completed: completed.length,
     };
   }, [shipments]);
@@ -369,7 +525,11 @@ export default function ImportsView() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <LiveClock />
-          <div className={tableStyles.viewToggle} role="group" aria-label="View mode">
+          <div
+            className={tableStyles.viewToggle}
+            role="group"
+            aria-label="View mode"
+          >
             <button
               type="button"
               className={`${tableStyles.toggleBtn} ${viewMode === "cards" ? tableStyles.toggleBtnActive : ""}`}
@@ -377,7 +537,8 @@ export default function ImportsView() {
               title="Card view"
               aria-pressed={viewMode === "cards"}
             >
-              <FontAwesomeIcon icon={faThLarge} /> <span className={tableStyles.toggleLabel}>Cards</span>
+              <FontAwesomeIcon icon={faThLarge} />{" "}
+              <span className={tableStyles.toggleLabel}>Cards</span>
             </button>
             <button
               type="button"
@@ -386,10 +547,29 @@ export default function ImportsView() {
               title="Table view"
               aria-pressed={viewMode === "table"}
             >
-              <FontAwesomeIcon icon={faTable} /> <span className={tableStyles.toggleLabel}>Table</span>
+              <FontAwesomeIcon icon={faTable} />{" "}
+              <span className={tableStyles.toggleLabel}>Table</span>
             </button>
           </div>
-          <button className={styles.addBtn} onClick={openAdd} id="add-import-btn">
+          <button
+            className={styles.cancelBtn}
+            onClick={openEmailPaste}
+            id="paste-email-import-btn"
+          >
+            <FontAwesomeIcon icon={faEnvelopeOpenText} /> Paste Email
+          </button>
+          <button
+            className={styles.cancelBtn}
+            onClick={() => setCsvModalOpen(true)}
+            id="import-csv-btn"
+          >
+            <FontAwesomeIcon icon={faFileCsv} /> Import CSV
+          </button>
+          <button
+            className={styles.addBtn}
+            onClick={openAdd}
+            id="add-import-btn"
+          >
             <FontAwesomeIcon icon={faPlus} /> New Permit
           </button>
         </div>
@@ -431,6 +611,13 @@ export default function ImportsView() {
           <div>
             <strong>{stats.gdp}</strong>
             <span>GDP shipments</span>
+          </div>
+        </div>
+        <div className={`${styles.statCard} ${styles.statHazmat}`}>
+          <FontAwesomeIcon icon={faSkullCrossbones} />
+          <div>
+            <strong>{stats.hazmat}</strong>
+            <span>hazmat shipments</span>
           </div>
         </div>
         <div className={`${styles.statCard} ${styles.statGood}`}>
@@ -499,6 +686,44 @@ export default function ImportsView() {
             ),
           )}
         </select>
+        <select
+          className={styles.filterSelect}
+          value={filterGenerated}
+          onChange={(e) => {
+            const mode = e.target.value;
+            setFilterGenerated(mode);
+            if (mode !== "custom") {
+              setGeneratedFrom("");
+              setGeneratedTo("");
+            }
+          }}
+          id="import-filter-generated"
+          title="Filter by when the permit was generated"
+        >
+          <option value="">Generated: Any Time</option>
+          <option value="today">Generated Today</option>
+          <option value="week">Generated This Week</option>
+          <option value="custom">Custom Range…</option>
+        </select>
+        {filterGenerated === "custom" && (
+          <div className={styles.dateRangeRow}>
+            <input
+              type="date"
+              className={styles.filterSelect}
+              value={generatedFrom}
+              onChange={(e) => setGeneratedFrom(e.target.value)}
+              aria-label="Generated from date"
+            />
+            <span className={styles.dateRangeSep}>–</span>
+            <input
+              type="date"
+              className={styles.filterSelect}
+              value={generatedTo}
+              onChange={(e) => setGeneratedTo(e.target.value)}
+              aria-label="Generated to date"
+            />
+          </div>
+        )}
         <button
           type="button"
           className={`${styles.groupToggle} ${groupByAirline ? styles.groupToggleActive : ""}`}
@@ -531,131 +756,293 @@ export default function ImportsView() {
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  <tr className={tableStyles.emptyRow}><td colSpan={9}>No import permits match your filters.</td></tr>
-                ) : filtered.map((s) => {
-                  const daysOver = storageDaysOver(s.lastFreeDay);
-                  const isOverdue = daysOver > 0;
-                  const remaining = daysUntil(s.lastFreeDay);
-                  const color = airlineColor(s.airline?.id);
-                  const awbDisplay = s.airline?.awbPrefix && s.airwaybillNumber
-                    ? `${s.airline.awbPrefix}-${s.airwaybillNumber}` : s.airwaybillNumber;
-                  const isOpen = expandedIds.has(s.id);
-                  return (
-                    <React.Fragment key={s.id}>
-                      <tr
-                        className={`${tableStyles.tr} ${isOverdue ? tableStyles.rowOverdue : ""} ${isOpen ? tableStyles.trOpen : ""}`}
-                        onClick={() => toggleExpanded(s.id)}
-                      >
-                        <td className={tableStyles.tdExpand}>
-                          <FontAwesomeIcon icon={faChevronDown} className={tableStyles.expandChevron} />
-                        </td>
-                        <td>
-                          <div className={tableStyles.awb}>{awbDisplay || "—"}</div>
-                          <div className={tableStyles.subId}>ORD {s.ordNumber || "—"}</div>
-                        </td>
-                        <td>
-                          <div className={tableStyles.airlineCell}>
-                            <span className={tableStyles.airlinePip} style={{ backgroundColor: color }} />
-                            {s.airline?.name || "—"} ({s.airline?.code || "—"})
-                          </div>
-                        </td>
-                        <td className={tableStyles.muted}>{s.warehouse?.name || "—"}</td>
-                        <td className={tableStyles.cargo}>
-                          <strong>{s.pieces}</strong> pcs · {s.weight} {s.weightUnit}
-                          {s.pmcCount > 0 && <span className={tableStyles.muted}> · {s.pmcCount} PMC</span>}
-                        </td>
-                        <td onClick={(e) => e.stopPropagation()}><StatusBadge status={s.status} /></td>
-                        <td>
-                          {s.lastFreeDay ? (
-                            isOverdue ? (
-                              <span className={tableStyles.danger}>+{daysOver}d over</span>
-                            ) : remaining !== null && remaining <= 1 ? (
-                              <span className={tableStyles.warn}>{remaining === 0 ? "Due today" : `${remaining}d left`}</span>
+                  <tr className={tableStyles.emptyRow}>
+                    <td colSpan={9}>No import permits match your filters.</td>
+                  </tr>
+                ) : (
+                  filtered.map((s) => {
+                    const daysOver = storageDaysOver(s.lastFreeDay);
+                    // Only flag storage fees for open permits (not Completed/Cancelled)
+                    const isOverdue =
+                      daysOver > 0 &&
+                      s.status !== "Completed" &&
+                      s.status !== "Cancelled";
+                    const remaining = daysUntil(s.lastFreeDay);
+                    const color = airlineColor(s.airline?.id);
+                    const awbDisplay =
+                      s.airline?.awbPrefix && s.airwaybillNumber
+                        ? `${s.airline.awbPrefix}-${s.airwaybillNumber}`
+                        : s.airwaybillNumber;
+                    const isOpen = expandedIds.has(s.id);
+                    return (
+                      <React.Fragment key={s.id}>
+                        <tr
+                          className={`${tableStyles.tr} ${isOverdue ? tableStyles.rowOverdue : ""} ${isOpen ? tableStyles.trOpen : ""}`}
+                          onClick={() => toggleExpanded(s.id)}
+                        >
+                          <td className={tableStyles.tdExpand}>
+                            <FontAwesomeIcon
+                              icon={faChevronDown}
+                              className={tableStyles.expandChevron}
+                            />
+                          </td>
+                          <td>
+                            <div className={tableStyles.awb}>
+                              {awbDisplay || "—"}
+                            </div>
+                            <div className={tableStyles.subId}>
+                              ORD {s.ordNumber || "—"}
+                            </div>
+                          </td>
+                          <td>
+                            <div className={tableStyles.airlineCell}>
+                              <span
+                                className={tableStyles.airlinePip}
+                                style={{ backgroundColor: color }}
+                              />
+                              {s.airline?.name || "—"} ({s.airline?.code || "—"}
+                              )
+                            </div>
+                          </td>
+                          <td className={tableStyles.muted}>
+                            {s.warehouse?.name || "—"}
+                          </td>
+                          <td className={tableStyles.cargo}>
+                            <strong>{s.pieces}</strong> pcs · {s.weight}{" "}
+                            {s.weightUnit}
+                            {s.pmcCount > 0 && (
+                              <span className={tableStyles.muted}>
+                                {" "}
+                                · {s.pmcCount} PMC
+                              </span>
+                            )}
+                          </td>
+                          <td onClick={(e) => e.stopPropagation()}>
+                            <StatusBadge status={s.status} />
+                          </td>
+                          <td>
+                            {s.lastFreeDay ? (
+                              isOverdue ? (
+                                <span className={tableStyles.danger}>
+                                  +{daysOver}d over
+                                </span>
+                              ) : remaining !== null &&
+                                remaining <= 1 &&
+                                remaining >= 0 ? (
+                                <span className={tableStyles.warn}>
+                                  {remaining === 0
+                                    ? "Due today"
+                                    : `${remaining}d left`}
+                                </span>
+                              ) : (
+                                <span className={tableStyles.muted}>
+                                  {formatDate(s.lastFreeDay)}
+                                </span>
+                              )
                             ) : (
-                              <span className={tableStyles.muted}>{formatDate(s.lastFreeDay)}</span>
-                            )
-                          ) : "—"}
-                        </td>
-                        <td>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                            {s.isGDP && <span className={`${tableStyles.badge} ${tableStyles.badgeGdp}`}>GDP</span>}
-                            {isOverdue && !s.storageFeePaid && <span className={`${tableStyles.badge} ${tableStyles.badgeFee}`}>Storage</span>}
-                            {s.storageFeePaid && <span className={`${tableStyles.badge} ${tableStyles.badgeOk}`}>Paid</span>}
-                          </div>
-                        </td>
-                        <td onClick={(e) => e.stopPropagation()}>
-                          <div className={tableStyles.actions}>
-                            <button
-                              className={`${tableStyles.actionBtn} ${tableStyles.printBtn}`}
-                              onClick={() => requestPrint(s)}
-                              title="Print permit"
+                              "—"
+                            )}
+                          </td>
+                          <td>
+                            <div
+                              style={{
+                                display: "flex",
+                                flexWrap: "wrap",
+                                gap: 4,
+                              }}
                             >
-                              <FontAwesomeIcon icon={faPrint} />
-                            </button>
-                            <button className={`${tableStyles.actionBtn} ${tableStyles.editBtn}`} onClick={() => openEdit(s)} title="Edit">
-                              <FontAwesomeIcon icon={faPencil} />
-                            </button>
-                            <button className={`${tableStyles.actionBtn} ${tableStyles.deleteBtn}`} onClick={() => setDeleteId(s.id)} title="Delete">
-                              <FontAwesomeIcon icon={faTrash} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr className={tableStyles.trExpandRow}>
-                        <td colSpan={9} className={tableStyles.tdExpandContent}>
-                          <div className={`${tableStyles.expandPanel} ${isOpen ? tableStyles.expandPanelOpen : ""}`}>
-                            <div className={tableStyles.expandPanelInner}>
-                              <div className={tableStyles.expandGrid}>
-                                {s.lastFreeDay && (
-                                  <div className={tableStyles.expandItem}>
-                                    <span className={tableStyles.expandLabel}>Last Free Day</span>
-                                    <span className={tableStyles.expandValue}>{formatDate(s.lastFreeDay)}</span>
-                                  </div>
-                                )}
-                                {(s.storageFeePerDay > 0 || s.terminalFee > 0) && (
-                                  <div className={tableStyles.expandItem}>
-                                    <span className={tableStyles.expandLabel}>Fees</span>
-                                    <span className={tableStyles.expandValue}>
-                                      {s.terminalFee > 0 && <>Terminal ${s.terminalFee}{s.terminalFeePaid ? " ✓" : " ⚠"} </>}
-                                      {s.storageFeePerDay > 0 && <>Storage ${s.storageFeePerDay}/day{s.storageFeePaid ? " ✓" : " ⚠"}</>}
-                                    </span>
-                                  </div>
-                                )}
-                                {s.isGDP && (
-                                  <div className={tableStyles.expandItem}>
-                                    <span className={tableStyles.expandLabel}>GDP</span>
-                                    <span className={tableStyles.expandValue}>{s.gdpTemperatureRange || "Temperature controlled"}</span>
-                                  </div>
-                                )}
-                                {s.pickupReadyAt && (
-                                  <div className={tableStyles.expandItem}>
-                                    <span className={tableStyles.expandLabel}>Cargo Available</span>
-                                    <span className={tableStyles.expandValue}>{formatDateTime(s.pickupReadyAt)}</span>
-                                  </div>
-                                )}
-                                {s.deliveryAppointmentAt && (
-                                  <div className={tableStyles.expandItem}>
-                                    <span className={tableStyles.expandLabel}>Warehouse Appt</span>
-                                    <span className={tableStyles.expandValue}>{formatDateTime(s.deliveryAppointmentAt)}</span>
-                                  </div>
-                                )}
-                                {s.pmcCount > 0 && (
-                                  <div className={tableStyles.expandItem}>
-                                    <span className={tableStyles.expandLabel}>PMCs</span>
-                                    <span className={tableStyles.expandValue}>{s.pmcCount}</span>
-                                  </div>
+                              {s.isGDP && (
+                                <span
+                                  className={`${tableStyles.badge} ${tableStyles.badgeGdp}`}
+                                >
+                                  <FontAwesomeIcon icon={faSnowflake} /> GDP
+                                </span>
+                              )}
+                              {s.isHazmat && (
+                                <span
+                                  className={`${tableStyles.badge} ${tableStyles.badgeHazmat}`}
+                                >
+                                  <FontAwesomeIcon icon={faSkullCrossbones} />{" "}
+                                  HAZMAT
+                                </span>
+                              )}
+                              {isOverdue && !s.storageFeePaid && (
+                                <span
+                                  className={`${tableStyles.badge} ${tableStyles.badgeFee}`}
+                                >
+                                  Storage
+                                </span>
+                              )}
+                              {s.storageFeePaid && (
+                                <span
+                                  className={`${tableStyles.badge} ${tableStyles.badgeOk}`}
+                                >
+                                  Paid
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td onClick={(e) => e.stopPropagation()}>
+                            <div className={tableStyles.actions}>
+                              <button
+                                className={`${tableStyles.actionBtn} ${tableStyles.printBtn}`}
+                                onClick={() => requestPrint(s)}
+                                title="Print permit"
+                              >
+                                <FontAwesomeIcon icon={faPrint} />
+                              </button>
+                              <button
+                                className={`${tableStyles.actionBtn} ${tableStyles.editBtn}`}
+                                onClick={() => openEdit(s)}
+                                title="Edit"
+                              >
+                                <FontAwesomeIcon icon={faPencil} />
+                              </button>
+                              <button
+                                className={`${tableStyles.actionBtn} ${tableStyles.deleteBtn}`}
+                                onClick={() => setDeleteId(s.id)}
+                                title="Delete"
+                              >
+                                <FontAwesomeIcon icon={faTrash} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr className={tableStyles.trExpandRow}>
+                          <td
+                            colSpan={9}
+                            className={tableStyles.tdExpandContent}
+                          >
+                            <div
+                              className={`${tableStyles.expandPanel} ${isOpen ? tableStyles.expandPanelOpen : ""}`}
+                            >
+                              <div className={tableStyles.expandPanelInner}>
+                                <div className={tableStyles.expandGrid}>
+                                  {s.flightEta && (
+                                    <div className={tableStyles.expandItem}>
+                                      <span className={tableStyles.expandLabel}>
+                                        Flight ETA
+                                      </span>
+                                      <span className={tableStyles.expandValue}>
+                                        {formatDateTime(s.flightEta)}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {s.permitGeneratedAt && (
+                                    <div className={tableStyles.expandItem}>
+                                      <span className={tableStyles.expandLabel}>
+                                        Permit Generated
+                                      </span>
+                                      <span className={tableStyles.expandValue}>
+                                        {formatDateTime(s.permitGeneratedAt)}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {s.lastFreeDay && (
+                                    <div className={tableStyles.expandItem}>
+                                      <span className={tableStyles.expandLabel}>
+                                        Last Free Day
+                                      </span>
+                                      <span className={tableStyles.expandValue}>
+                                        {formatDate(s.lastFreeDay)}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {(s.storageFeePerDay > 0 ||
+                                    s.terminalFee > 0) && (
+                                    <div className={tableStyles.expandItem}>
+                                      <span className={tableStyles.expandLabel}>
+                                        Fees
+                                      </span>
+                                      <span className={tableStyles.expandValue}>
+                                        {s.terminalFee > 0 && (
+                                          <>
+                                            Terminal ${s.terminalFee}
+                                            {s.terminalFeePaid
+                                              ? " ✓"
+                                              : " ⚠"}{" "}
+                                          </>
+                                        )}
+                                        {s.storageFeePerDay > 0 && (
+                                          <>
+                                            Storage ${s.storageFeePerDay}/day
+                                            {s.storageFeePaid ? " ✓" : " ⚠"}
+                                          </>
+                                        )}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {s.isGDP && (
+                                    <div className={tableStyles.expandItem}>
+                                      <span className={tableStyles.expandLabel}>
+                                        GDP
+                                      </span>
+                                      <span className={tableStyles.expandValue}>
+                                        {s.gdpTemperatureRange ||
+                                          "Temperature controlled"}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {s.isHazmat && (
+                                    <div className={tableStyles.expandItem}>
+                                      <span className={tableStyles.expandLabel}>
+                                        Hazmat
+                                      </span>
+                                      <span className={tableStyles.expandValue}>
+                                        {s.hazmatClass || "Dangerous goods"}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {s.pickupReadyAt && (
+                                    <div className={tableStyles.expandItem}>
+                                      <span className={tableStyles.expandLabel}>
+                                        Cargo Available
+                                      </span>
+                                      <span className={tableStyles.expandValue}>
+                                        {formatDateTime(s.pickupReadyAt)}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {s.deliveryAppointmentAt && (
+                                    <div className={tableStyles.expandItem}>
+                                      <span className={tableStyles.expandLabel}>
+                                        Warehouse Appt
+                                      </span>
+                                      <span className={tableStyles.expandValue}>
+                                        {formatDateTime(
+                                          s.deliveryAppointmentAt,
+                                        )}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {s.pmcCount > 0 && (
+                                    <div className={tableStyles.expandItem}>
+                                      <span className={tableStyles.expandLabel}>
+                                        PMCs
+                                      </span>
+                                      <span className={tableStyles.expandValue}>
+                                        {s.pmcCount}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                                {s.notes ? (
+                                  <p className={tableStyles.expandNotes}>
+                                    {s.notes}
+                                  </p>
+                                ) : (
+                                  <p className={tableStyles.expandNotes}>
+                                    No notes on file.
+                                  </p>
                                 )}
                               </div>
-                              {s.notes
-                                ? <p className={tableStyles.expandNotes}>{s.notes}</p>
-                                : <p className={tableStyles.expandNotes}>No notes on file.</p>}
                             </div>
-                          </div>
-                        </td>
-                      </tr>
-                    </React.Fragment>
-                  );
-                })}
+                          </td>
+                        </tr>
+                      </React.Fragment>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -684,7 +1071,11 @@ export default function ImportsView() {
             <div className={styles.grid}>
               {group.items.map((s) => {
                 const daysOver = storageDaysOver(s.lastFreeDay);
-                const isOverdue = daysOver > 0;
+                // Only flag storage fees for open permits (not Completed/Cancelled)
+                const isOverdue =
+                  daysOver > 0 &&
+                  s.status !== "Completed" &&
+                  s.status !== "Cancelled";
                 const remaining = daysUntil(s.lastFreeDay);
                 const color = airlineColor(s.airline?.id);
                 const awbDisplay =
@@ -751,6 +1142,32 @@ export default function ImportsView() {
                           <StatusBadge status={s.status} />
                         </div>
                       </div>
+                      {(s.originCity || s.flightNumber || s.flightEta) && (
+                        <div className={styles.row}>
+                          <div className={styles.field}>
+                            <span className={styles.fieldLabel}>Origin</span>
+                            <span className={styles.fieldValue}>
+                              {s.originCity || "—"}
+                            </span>
+                          </div>
+                          <div className={styles.field}>
+                            <span className={styles.fieldLabel}>Flight</span>
+                            <span className={styles.fieldValue}>
+                              {s.flightNumber || "—"}
+                            </span>
+                          </div>
+                          {s.flightEta && (
+                            <div className={styles.field}>
+                              <span className={styles.fieldLabel}>
+                                Flight ETA
+                              </span>
+                              <span className={styles.fieldValue}>
+                                {new Date(s.flightEta).toLocaleString()}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <div className={styles.row}>
                         <div className={styles.field}>
                           <span className={styles.fieldLabel}>Airline</span>
@@ -808,9 +1225,15 @@ export default function ImportsView() {
                           {s.gdpTemperatureRange || "Temperature Controlled"}
                         </div>
                       )}
+                      {s.isHazmat && (
+                        <div className={styles.hazmatBadge}>
+                          <FontAwesomeIcon icon={faSkullCrossbones} />
+                          HAZMAT{s.hazmatClass ? `: ${s.hazmatClass}` : ""}
+                        </div>
+                      )}
                       {s.lastFreeDay && (
                         <div
-                          className={`${styles.lfdRow} ${isOverdue ? styles.lfdOverdue : remaining <= 1 ? styles.lfdWarn : ""}`}
+                          className={`${styles.lfdRow} ${isOverdue ? styles.lfdOverdue : remaining !== null && remaining <= 1 && remaining >= 0 ? styles.lfdWarn : ""}`}
                         >
                           <span>
                             <FontAwesomeIcon icon={faClock} /> Last Free Day:{" "}
@@ -821,7 +1244,8 @@ export default function ImportsView() {
                               +{daysOver}d @ ${s.storageFeePerDay || "?"}/day
                             </span>
                           ) : (
-                            remaining !== null && (
+                            remaining !== null &&
+                            remaining >= 0 && (
                               <span className={styles.dueSoonBadge}>
                                 {remaining === 0
                                   ? "Due today"
@@ -906,7 +1330,7 @@ export default function ImportsView() {
           {error && <div className={styles.formError}>{error}</div>}
           <div className={styles.formSectionLabel}>Permit Identifiers</div>
           <div className={styles.formGrid}>
-            <div className={styles.formGroup}>
+            <div className={formGroupClass("airline")}>
               <label className={styles.label}>Airline *</label>
               <select
                 className={styles.input}
@@ -927,7 +1351,7 @@ export default function ImportsView() {
                 </small>
               )}
             </div>
-            <div className={styles.formGroup}>
+            <div className={formGroupClass("airwaybillNumber")}>
               <label className={styles.label}>AWB Number *</label>
               <input
                 className={styles.input}
@@ -946,7 +1370,7 @@ export default function ImportsView() {
                 Include prefix if not auto-filled
               </small>
             </div>
-            <div className={styles.formGroup}>
+            <div className={formGroupClass("ordNumber")}>
               <label className={styles.label}>ORD Number *</label>
               <input
                 className={styles.input}
@@ -958,10 +1382,47 @@ export default function ImportsView() {
                 placeholder="CVA2116055"
               />
             </div>
+            <div className={formGroupClass("originCity")}>
+              <label className={styles.label}>Origin</label>
+              <input
+                className={styles.input}
+                value={form.originCity}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, originCity: e.target.value }))
+                }
+                placeholder="Heathrow Apt/London"
+              />
+            </div>
+            <div className={formGroupClass("flightNumber")}>
+              <label className={styles.label}>Flight Number</label>
+              <input
+                className={styles.input}
+                value={form.flightNumber}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    flightNumber: e.target.value.toUpperCase(),
+                  }))
+                }
+                placeholder="AA91/08"
+              />
+            </div>
+            <div className={formGroupClass("flightEta")}>
+              <label className={styles.label}>Flight ETA</label>
+              <DateTimePicker
+                value={form.flightEta || ""}
+                onChange={(date) =>
+                  setForm((f) => ({
+                    ...f,
+                    flightEta: date ? toLocalISO(date) : "",
+                  }))
+                }
+              />
+            </div>
           </div>
           <div className={styles.formSectionLabel}>Destination & Cargo</div>
           <div className={styles.formGrid}>
-            <div className={styles.formGroup}>
+            <div className={formGroupClass("warehouse")}>
               <label className={styles.label}>Destination Warehouse *</label>
               <select
                 className={styles.input}
@@ -979,7 +1440,7 @@ export default function ImportsView() {
                 ))}
               </select>
             </div>
-            <div className={styles.formGroup}>
+            <div className={formGroupClass("pieces")}>
               <label className={styles.label}>Pieces *</label>
               <input
                 className={styles.input}
@@ -993,14 +1454,14 @@ export default function ImportsView() {
                 placeholder="0"
               />
             </div>
-            <div className={styles.formGroup}>
+            <div className={formGroupClass("weight")}>
               <label className={styles.label}>Weight *</label>
               <div className={styles.weightInput}>
                 <input
                   className={styles.input}
                   type="number"
                   min={0}
-                  step="0.1"
+                  step="any"
                   required
                   value={form.weight}
                   onChange={(e) =>
@@ -1043,7 +1504,9 @@ export default function ImportsView() {
                 onChange={(date) =>
                   setForm((f) => ({
                     ...f,
-                    lastFreeDay: date ? toLocalISO(date, { dateOnly: true }) : "",
+                    lastFreeDay: date
+                      ? toLocalISO(date, { dateOnly: true })
+                      : "",
                   }))
                 }
               />
@@ -1136,6 +1599,28 @@ export default function ImportsView() {
               <label className={styles.checkboxLabel}>
                 <input
                   type="checkbox"
+                  checked={form.isHazmat}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, isHazmat: e.target.checked }))
+                  }
+                />
+                Hazmat (Dangerous Goods)
+              </label>
+              {form.isHazmat && (
+                <input
+                  className={styles.input}
+                  placeholder="Hazmat class (e.g., Class 9, UN3480)"
+                  value={form.hazmatClass}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, hazmatClass: e.target.value }))
+                  }
+                />
+              )}
+            </div>
+            <div className={styles.formGroup}>
+              <label className={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
                   checked={form.storageFeePaid}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, storageFeePaid: e.target.checked }))
@@ -1195,6 +1680,15 @@ export default function ImportsView() {
               />
             </div>
           </div>
+          {saveDisabled && !saving && (
+            <div
+              className={styles.hint}
+              style={{ color: "var(--danger)", marginBottom: 8 }}
+            >
+              {describeMissingCritical(form, IMPORT_FIELD_SEVERITY) ||
+                "Fill in the required fields above to save."}
+            </div>
+          )}
           <div className={styles.formActions}>
             <button
               type="button"
@@ -1206,7 +1700,7 @@ export default function ImportsView() {
             <button
               type="submit"
               className={styles.saveBtn}
-              disabled={saving}
+              disabled={saveDisabled}
               id="im-save-btn"
             >
               {saving ? "Saving…" : editing ? "Save Changes" : "Create Permit"}
@@ -1239,40 +1733,58 @@ export default function ImportsView() {
         </div>
       </Modal>
 
-      {/* ── Hidden print-only render of the CEVA permit ── */}
-      <div style={{ display: "none" }} aria-hidden="true">
-        {printJob && (
-          <div ref={printRef}>
-            <CevaTemplate
-              shipment={printJob.shipment}
-              airline={
-                // Prefer full airline (includes terminalAddress) over the
-                // partial relation embedded on the shipment.
-                airlines.find((a) => a.id === printJob.shipment.airline?.id) ||
-                printJob.shipment.airline
-              }
-              warehouse={
-                // Prefer the full warehouse record (has address fields) over
-                // the partial relation embedded on the shipment (often just id/name).
-                warehouses.find((w) => w.id === printJob.shipment.warehouse?.id) ||
-                printJob.shipment.warehouse
-              }
-            />
-          </div>
-        )}
+      <EmailPasteModal
+        isOpen={emailModalOpen}
+        onClose={() => setEmailModalOpen(false)}
+        type="Import"
+        airlines={airlines}
+        warehouses={warehouses}
+        formStyles={styles}
+        onUseDetails={handleEmailFields}
+      />
+
+      <CsvImportModal
+        isOpen={csvModalOpen}
+        onClose={() => setCsvModalOpen(false)}
+        airlines={airlines}
+        warehouses={warehouses}
+        formStyles={styles}
+        onImported={load}
+      />
+
+      {/* ── Hidden print-only render of the CEVA permit ──
+          Always mounted (not conditional on printJob) so printRef.current
+          is never null when triggerPrint() fires. */}
+      <div
+        style={{
+          position: "absolute",
+          top: "-10000px",
+          left: "-10000px",
+          // No fixed width/height/overflow here — the wrapper must not
+          // clip or zero-out .page's own layout (8.5in x 11in). It just
+          // needs to sit off-screen so it never overlaps app UI on screen.
+        }}
+        aria-hidden="true"
+      >
+        <div ref={printRef}>
+          <CevaTemplate
+            shipment={printJob?.shipment}
+            airline={
+              // Prefer full airline (includes terminalAddress) over the
+              // partial relation embedded on the shipment.
+              airlines.find((a) => a.id === printJob?.shipment?.airline?.id) ||
+              printJob?.shipment?.airline
+            }
+            warehouse={
+              // Prefer the full warehouse record (has address fields) over
+              // the partial relation embedded on the shipment (often just id/name).
+              warehouses.find(
+                (w) => w.id === printJob?.shipment?.warehouse?.id,
+              ) || printJob?.shipment?.warehouse
+            }
+          />
+        </div>
       </div>
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-

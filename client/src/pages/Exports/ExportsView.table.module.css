@@ -59,6 +59,14 @@
 .actionBtn { composes: actionBtn from '../../styles/shared.module.css'; }
 .editBtn { composes: actionEdit from '../../styles/shared.module.css'; }
 .deleteBtn { composes: actionDelete from '../../styles/shared.module.css'; }
+.printBtn {
+  composes: actionBtn from '../../styles/shared.module.css';
+  color: var(--accent-cyan);
+}
+.printBtn:hover {
+  color: var(--accent-cyan);
+  background: rgba(0, 212, 255, 0.12);
+}
 
 .emptyRow { composes: emptyRow from '../../styles/shared.module.css'; }
 
@@ -83,4 +91,3 @@
 @media (max-width: 720px) {
   .toggleBtn { padding: 7px 10px; }
 }
-

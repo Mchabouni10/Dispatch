@@ -10,6 +10,10 @@ const {
 } = require('./dispatch.helpers');
 const { checkoutEquipment, releaseTripCreatedCheckouts } = require('../../lib/equipmentHandoff');
 const { checkEquipmentEligible } = require('./tripEligibility');
+const { checkRunEligibility } = require('../../lib/dispatchEligibility');
+const { emit } = require('../../lib/realtime');
+const requirePermission = require('../../middleware/requirePermission');
+router.use(requirePermission('dispatch', 'view'));
 
 // GET all trips
 router.get('/', async (req, res) => {
@@ -76,7 +80,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST create trip
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('dispatch', 'full'), async (req, res) => {
   try {
     const {
       driverId,
@@ -110,8 +114,9 @@ router.post('/', async (req, res) => {
 
     // Check shipments
     let resolvedRunType = runType;
+    let manifest = [];
     if (shipmentIds && shipmentIds.length > 0) {
-      const manifest = await prisma.shipment.findMany({
+      manifest = await prisma.shipment.findMany({
         where: { id: { in: shipmentIds } }
       });
       if (manifest.length !== shipmentIds.length) {
@@ -142,6 +147,22 @@ router.post('/', async (req, res) => {
       if (Number.isNaN(doorNum) || doorNum < 1 || doorNum > 30) {
         return res.status(400).json({ message: 'Door number must be between 1 and 30' });
       }
+    }
+
+    // ─── Driver/equipment/cargo compatibility ───
+    // Availability was already checked above (checkEquipmentEligible); this
+    // covers whether the driver is actually *allowed* to take this specific
+    // truck/trailer/manifest combination — license class vs equipment type,
+    // trailer eligibility, and hazmat/GDP certification vs the shipments on
+    // the manifest. See lib/dispatchEligibility.js for the rules themselves.
+    const eligibility = checkRunEligibility({
+      driver,
+      truck: truckCheck.unit,
+      trailer: trailerCheck?.unit || null,
+      shipments: manifest,
+    });
+    if (!eligibility.ok) {
+      return res.status(409).json({ message: eligibility.errors.join(' — ') });
     }
 
     // ─── TRANSACTION WITH ATOMIC TRIP NUMBER GENERATION ───
@@ -213,6 +234,7 @@ router.post('/', async (req, res) => {
     });
 
     const populated = await populateTrip(trip);
+    emit('trip:upsert', populated);
     res.status(201).json(populated);
   } catch (err) {
     console.error('[POST /api/dispatch]', err);
@@ -221,7 +243,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT update trip
-router.put('/:id', async (req, res) => {
+router.put('/:id', requirePermission('dispatch', 'full'), async (req, res) => {
   try {
     const tripId = req.params.id;
     const existingTrip = await prisma.trip.findUnique({
@@ -277,6 +299,30 @@ router.put('/:id', async (req, res) => {
     const newShipmentIds = shipmentIds !== undefined ? shipmentIds : oldShipmentIds;
     const removedShipmentIds = oldShipmentIds.filter(id => !newShipmentIds.includes(id));
     const addedShipmentIds = newShipmentIds.filter(id => !oldShipmentIds.includes(id));
+
+    // ─── Driver/equipment/cargo compatibility ───
+    // Re-checked on every update against the EFFECTIVE (post-edit) driver,
+    // truck, trailer, and manifest — not just whatever field changed. That
+    // matters because e.g. adding a hazmat shipment to an already-assigned
+    // trip is just as much a compatibility problem as changing the driver
+    // would be, even though driverId/truckId/trailerId are all untouched.
+    const effectiveTruckId = truckId !== undefined ? truckId : existingTrip.truckId;
+    const effectiveTrailerId = trailerId !== undefined ? trailerId : existingTrip.trailerId;
+    const [effectiveDriver, effectiveTruck, effectiveTrailer, effectiveShipments] = await Promise.all([
+      effectiveDriverId ? prisma.driver.findUnique({ where: { id: effectiveDriverId } }) : null,
+      newTruckUnit || (effectiveTruckId ? prisma.equipment.findUnique({ where: { id: effectiveTruckId } }) : null),
+      newTrailerUnit || (effectiveTrailerId ? prisma.equipment.findUnique({ where: { id: effectiveTrailerId } }) : null),
+      newShipmentIds.length > 0 ? prisma.shipment.findMany({ where: { id: { in: newShipmentIds } } }) : [],
+    ]);
+    const eligibility = checkRunEligibility({
+      driver: effectiveDriver,
+      truck: effectiveTruck,
+      trailer: effectiveTrailer,
+      shipments: effectiveShipments,
+    });
+    if (!eligibility.ok) {
+      return res.status(409).json({ message: eligibility.errors.join(' — ') });
+    }
 
     const updatedTrip = await prisma.$transaction(async (tx) => {
       if (newDriverId !== oldDriverId) {
@@ -359,6 +405,7 @@ router.put('/:id', async (req, res) => {
     });
 
     const populated = await populateTrip(updatedTrip);
+    emit('trip:upsert', populated);
     res.json(populated);
   } catch (err) {
     if (err.code === 'P2025') {
@@ -370,7 +417,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE / Cancel trip
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requirePermission('dispatch', 'full'), async (req, res) => {
   try {
     const trip = await prisma.trip.findUnique({ where: { id: req.params.id } });
     if (!trip) return res.status(404).json({ message: 'Trip not found' });
@@ -457,6 +504,7 @@ router.delete('/:id', async (req, res) => {
       await tx.trip.delete({ where: { id: req.params.id } });
     });
 
+    emit('trip:removed', trip.id);
     res.json({ message: 'Trip cancelled and deleted successfully' });
   } catch (err) {
     if (err.code === 'P2025') {

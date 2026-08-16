@@ -192,6 +192,20 @@ function isSameDay(a, b) {
   );
 }
 
+const MONTH_SHORT_LABELS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+// Years are browsed in fixed-size blocks (e.g. 2020–2031) instead of one
+// at a time, so jumping from, say, 2026 back to a 1985 birth year takes a
+// couple of clicks instead of dozens.
+const YEAR_BLOCK_SIZE = 12;
+
+function yearBlockStartFor(year) {
+  return Math.floor(year / YEAR_BLOCK_SIZE) * YEAR_BLOCK_SIZE;
+}
+
 export default function DateTimePicker({
   value,
   onChange,
@@ -203,6 +217,14 @@ export default function DateTimePicker({
 
   const [isOpen, setIsOpen] = useState(false);
   const [viewDate, setViewDate] = useState(dateValue || new Date());
+  // "days" (normal calendar grid) | "months" (12-month grid for a chosen
+  // year) | "years" (grid of years, paged in blocks). Clicking the header
+  // label drills down into "years" so the year can be picked directly
+  // instead of stepping through months one at a time.
+  const [viewMode, setViewMode] = useState("days");
+  const [yearBlockStart, setYearBlockStart] = useState(() =>
+    yearBlockStartFor((dateValue || new Date()).getFullYear()),
+  );
   // Authoritative "working" date for the duration of an edit session.
   // Hour/minute/am-pm clicks build off THIS instead of re-deriving from the
   // `value` prop each time — otherwise two fast clicks in a row (e.g. hour
@@ -303,7 +325,16 @@ export default function DateTimePicker({
     if (!isOpen) return;
     const pos = computePosition();
     if (pos) setCoords(pos);
-  }, [isOpen, viewDate]);
+  }, [isOpen, viewDate, viewMode]);
+
+  // Always reopen on the day grid, and re-center the year block on
+  // whatever year is currently selected (or today's, if empty).
+  useEffect(() => {
+    if (!isOpen) return;
+    setViewMode("days");
+    setYearBlockStart(yearBlockStartFor(viewDate.getFullYear()));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -368,9 +399,52 @@ export default function DateTimePicker({
     commit(draftDate, draftHour, draftMinute, ap);
   }
 
+  // Header label: drills down a level. On the day grid it jumps straight
+  // to year selection (the thing that was previously buggy/slow); on the
+  // month grid it goes back up to year selection too.
+  function handleHeaderClick() {
+    if (viewMode === "years") return;
+    setYearBlockStart(yearBlockStartFor(viewDate.getFullYear()));
+    setViewMode("years");
+  }
+
+  // Prev/next chevrons step by whatever unit is currently being browsed:
+  // a month in day view, a year in month view, a full block in year view.
+  function handlePrevNav() {
+    if (viewMode === "days") {
+      setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1));
+    } else if (viewMode === "months") {
+      setViewDate(new Date(viewDate.getFullYear() - 1, viewDate.getMonth(), 1));
+    } else {
+      setYearBlockStart((y) => y - YEAR_BLOCK_SIZE);
+    }
+  }
+
+  function handleNextNav() {
+    if (viewMode === "days") {
+      setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1));
+    } else if (viewMode === "months") {
+      setViewDate(new Date(viewDate.getFullYear() + 1, viewDate.getMonth(), 1));
+    } else {
+      setYearBlockStart((y) => y + YEAR_BLOCK_SIZE);
+    }
+  }
+
+  function handleYearClick(year) {
+    setViewDate(new Date(year, viewDate.getMonth(), 1));
+    setViewMode("months");
+  }
+
+  function handleMonthClick(monthIndex) {
+    setViewDate(new Date(viewDate.getFullYear(), monthIndex, 1));
+    setViewMode("days");
+  }
+
   function handleToday() {
     const now = new Date();
     setViewDate(now);
+    setViewMode("days");
+    setYearBlockStart(yearBlockStartFor(now.getFullYear()));
     const h12 = now.getHours() % 12 === 0 ? 12 : now.getHours() % 12;
     const ap = now.getHours() >= 12 ? "PM" : "AM";
     setDraftHour(h12);
@@ -425,75 +499,127 @@ export default function DateTimePicker({
                 ].join(" ")}
               >
                 <div className={styles.monthRow}>
-                  <span className={styles.monthLabel}>
-                    {MONTH_LABELS[viewDate.getMonth()]} {viewDate.getFullYear()}
-                  </span>
+                  <button
+                    type="button"
+                    className={styles.headerLabel}
+                    onClick={handleHeaderClick}
+                    disabled={viewMode === "years"}
+                    aria-label="Choose year"
+                  >
+                    {viewMode === "days" &&
+                      `${MONTH_LABELS[viewDate.getMonth()]} ${viewDate.getFullYear()}`}
+                    {viewMode === "months" && viewDate.getFullYear()}
+                    {viewMode === "years" &&
+                      `${yearBlockStart} – ${yearBlockStart + YEAR_BLOCK_SIZE - 1}`}
+                  </button>
                   <div className={styles.monthNav}>
                     <button
                       type="button"
                       className={styles.navBtn}
-                      onClick={() =>
-                        setViewDate(
-                          new Date(
-                            viewDate.getFullYear(),
-                            viewDate.getMonth() - 1,
-                            1,
-                          ),
-                        )
-                      }
-                      aria-label="Previous month"
+                      onClick={handlePrevNav}
+                      aria-label="Previous"
                     >
                       <FiChevronLeft />
                     </button>
                     <button
                       type="button"
                       className={styles.navBtn}
-                      onClick={() =>
-                        setViewDate(
-                          new Date(
-                            viewDate.getFullYear(),
-                            viewDate.getMonth() + 1,
-                            1,
-                          ),
-                        )
-                      }
-                      aria-label="Next month"
+                      onClick={handleNextNav}
+                      aria-label="Next"
                     >
                       <FiChevronRight />
                     </button>
                   </div>
                 </div>
 
-                <div className={styles.dayLabelRow}>
-                  {DAY_LABELS.map((d, i) => (
-                    <span key={i} className={styles.dayLabel}>
-                      {d}
-                    </span>
-                  ))}
-                </div>
+                {viewMode === "days" && (
+                  <>
+                    <div className={styles.dayLabelRow}>
+                      {DAY_LABELS.map((d, i) => (
+                        <span key={i} className={styles.dayLabel}>
+                          {d}
+                        </span>
+                      ))}
+                    </div>
 
-                <div className={styles.dayGrid}>
-                  {cells.map((day, i) => {
-                    const outsideMonth = day.getMonth() !== viewDate.getMonth();
-                    const selected = isSameDay(day, dateValue);
-                    const isToday = isSameDay(day, today);
-                    return (
-                      <button
-                        type="button"
-                        key={i}
-                        className={[
-                          styles.dayCell,
-                          outsideMonth ? styles.dayCellMuted : "",
-                          selected ? styles.dayCellSelected : "",
-                          isToday && !selected ? styles.dayCellToday : "",
-                        ].join(" ")}
-                        onClick={() => handleDayClick(day)}
-                      >
-                        {day.getDate()}
-                      </button>
-                    );
-                  })}
-                </div>
+                    <div className={styles.dayGrid}>
+                      {cells.map((day, i) => {
+                        const outsideMonth =
+                          day.getMonth() !== viewDate.getMonth();
+                        const selected = isSameDay(day, dateValue);
+                        const isToday = isSameDay(day, today);
+                        return (
+                          <button
+                            type="button"
+                            key={i}
+                            className={[
+                              styles.dayCell,
+                              outsideMonth ? styles.dayCellMuted : "",
+                              selected ? styles.dayCellSelected : "",
+                              isToday && !selected ? styles.dayCellToday : "",
+                            ].join(" ")}
+                            onClick={() => handleDayClick(day)}
+                          >
+                            {day.getDate()}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+
+                {viewMode === "months" && (
+                  <div className={styles.monthGrid}>
+                    {MONTH_SHORT_LABELS.map((label, i) => {
+                      const selected =
+                        dateValue &&
+                        dateValue.getFullYear() === viewDate.getFullYear() &&
+                        dateValue.getMonth() === i;
+                      const isCurrent =
+                        today.getFullYear() === viewDate.getFullYear() &&
+                        today.getMonth() === i;
+                      return (
+                        <button
+                          type="button"
+                          key={label}
+                          className={[
+                            styles.monthCell,
+                            selected ? styles.monthCellSelected : "",
+                            isCurrent && !selected ? styles.monthCellToday : "",
+                          ].join(" ")}
+                          onClick={() => handleMonthClick(i)}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {viewMode === "years" && (
+                  <div className={styles.yearGrid}>
+                    {Array.from({ length: YEAR_BLOCK_SIZE }, (_, i) => {
+                      const year = yearBlockStart + i;
+                      const selected =
+                        dateValue && dateValue.getFullYear() === year;
+                      const isCurrent = today.getFullYear() === year;
+                      return (
+                        <button
+                          type="button"
+                          key={year}
+                          className={[
+                            styles.yearCell,
+                            selected ? styles.yearCellSelected : "",
+                            isCurrent && !selected ? styles.yearCellToday : "",
+                          ].join(" ")}
+                          onClick={() => handleYearClick(year)}
+                        >
+                          {year}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Time side — omitted entirely in dateOnly mode */}

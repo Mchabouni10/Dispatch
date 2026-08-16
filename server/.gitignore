@@ -1,5 +1,62 @@
-node_modules
-# Keep environment variables out of version control
-.env
+--- .gitignore 
+node_modules/
+client/node_modules/
+server/node_modules/
+client/dist/
+server/.env
+server/uploads/
+.DS_Store
 
-/generated/prisma
++++ .gitignore (修改后)
+```
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Editors
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+.env
+.env.local
+.env.*
+.python-version
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache/
+.pytest_cache/
+.hypothesis/
+.coverage/
+htmlcov/
+.installed.cfg
+.lib/
+.eggs/
+.egg-info/
+*.egg-info/
+*.egg
+```
